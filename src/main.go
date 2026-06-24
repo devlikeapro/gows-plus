@@ -117,6 +117,7 @@ func main() {
 	clientCfg := getClientConfig()
 	log.Infof("Using device name: '%s', browser name: '%s'", clientCfg.DeviceName, clientCfg.BrowserName)
 	gows.SetDeviceAndBrowser(clientCfg.DeviceName, clientCfg.BrowserName)
+	PatchDeviceProps(gows.GetDeviceProps())
 
 	// Build the server
 	grpcServer := buildGrpcServer(log)

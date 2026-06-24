@@ -24,3 +24,11 @@ tidy: build-proto
 build:
 	cd src && \
 	go build -o ../bin/gows .
+
+build-mlow:
+	cd src && \
+	CGO_ENABLED=1 go build -tags mlow -o ../bin/gows .
+
+build-mlow-docker:
+	cd src && \
+	CGO_ENABLED=1 GOOS=linux go build -tags mlow -o ../bin/gows .

@@ -2,6 +2,8 @@ package server
 
 import (
 	"encoding/json"
+
+	"github.com/devlikeapro/gows/gows"
 	"github.com/devlikeapro/gows/proto"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
@@ -46,15 +48,11 @@ func (s *Server) StreamEvents(req *__.StreamEventsRequest, stream grpc.ServerStr
 			if event == nil {
 				continue
 			}
-			// Remove * at the start if it's *
-			eventType := reflect.TypeOf(event).String()
-			eventType = strings.TrimPrefix(eventType, "*")
-			if _, ok := exclude[eventType]; ok {
+			eventType, jsonString := s.formatStreamEvent(event)
+			if jsonString == "" {
 				continue
 			}
-
-			jsonString := s.safeMarshal(event)
-			if jsonString == "" {
+			if _, ok := exclude[eventType]; ok {
 				continue
 			}
 
@@ -113,4 +111,13 @@ func (s *Server) removeListener(session string, id uuid.UUID) {
 		delete(s.listeners, session)
 	}
 	close(listener)
+}
+
+func (s *Server) formatStreamEvent(event interface{}) (eventType string, jsonString string) {
+	if ce, ok := event.(*gows.CallLifecycleEvent); ok {
+		return ce.Event, s.safeMarshal(ce)
+	}
+	eventType = reflect.TypeOf(event).String()
+	eventType = strings.TrimPrefix(eventType, "*")
+	return eventType, s.safeMarshal(event)
 }

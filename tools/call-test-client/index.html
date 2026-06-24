@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>WAHA / GOWS — teste WebRTC de chamada</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    label { display: block; margin-top: 1rem; }
+    input, button { width: 100%; padding: 0.5rem; margin-top: 0.25rem; box-sizing: border-box; }
+    button { cursor: pointer; margin-top: 1rem; }
+    pre { background: #f4f4f4; padding: 0.75rem; overflow: auto; font-size: 0.8rem; }
+    .row { display: flex; gap: 0.5rem; }
+    .row button { flex: 1; }
+  </style>
+</head>
+<body>
+  <h1>Teste E2E — chamada VoIP via WAHA</h1>
+  <p>Configure a URL base do WAHA e a sessão. Requer <code>POST /calls</code> e <code>POST /calls/{id}/webrtc</code> implementados no WAHA.</p>
+
+  <label>WAHA base URL <input id="base" value="http://localhost:3000" /></label>
+  <label>Sessão <input id="session" value="default" /></label>
+  <label>API Key (opcional) <input id="apiKey" placeholder="X-Api-Key" /></label>
+  <label>Telefone / JID <input id="jid" placeholder="5511999999999" /></label>
+  <label><input type="checkbox" id="video" /> Chamada de vídeo (signaling; áudio via WebRTC)</label>
+
+  <div class="row">
+    <button type="button" id="start">Iniciar chamada</button>
+    <button type="button" id="accept" disabled>Aceitar (incoming)</button>
+    <button type="button" id="end" disabled>Encerrar</button>
+  </div>
+
+  <label>Call ID <input id="callId" readonly /></label>
+  <pre id="log"></pre>
+  <audio id="remote" autoplay playsinline></audio>
+
+  <script>
+    const log = (msg) => {
+      const el = document.getElementById('log');
+      el.textContent += msg + '\n';
+    };
+
+    let pc = null;
+    let localStream = null;
+    let callId = '';
+
+    function headers() {
+      const h = { 'Content-Type': 'application/json' };
+      const key = document.getElementById('apiKey').value.trim();
+      if (key) h['X-Api-Key'] = key;
+      return h;
+    }
+
+    function api(path, opts = {}) {
+      const base = document.getElementById('base').value.replace(/\/$/, '');
+      const session = document.getElementById('session').value.trim();
+      return fetch(`${base}/api/${session}${path}`, {
+        ...opts,
+        headers: { ...headers(), ...(opts.headers || {}) },
+      });
+    }
+
+    async function openWebRTC() {
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      pc = new RTCPeerConnection();
+      localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
+      pc.ontrack = (e) => {
+        document.getElementById('remote').srcObject = e.streams[0];
+      };
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      const res = await api(`/calls/${callId}/webrtc`, {
+        method: 'POST',
+        body: JSON.stringify({ sdp_offer: offer.sdp }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { sdp_answer } = await res.json();
+      await pc.setRemoteDescription({ type: 'answer', sdp: sdp_answer });
+      log('WebRTC conectado');
+    }
+
+    document.getElementById('start').onclick = async () => {
+      try {
+        const phone = document.getElementById('jid').value.trim();
+        const res = await api('/calls', {
+          method: 'POST',
+          body: JSON.stringify({
+            phone,
+            video: document.getElementById('video').checked,
+          }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        callId = data.call?.callId || data.call_id;
+        document.getElementById('callId').value = callId;
+        document.getElementById('end').disabled = false;
+        log('Chamada iniciada: ' + callId);
+        await openWebRTC();
+      } catch (e) {
+        log('Erro: ' + e.message);
+      }
+    };
+
+    document.getElementById('accept').onclick = async () => {
+      try {
+        if (!callId) throw new Error('informe call id via webhook call.received');
+        await api(`/calls/${callId}/accept`, { method: 'POST' });
+        await openWebRTC();
+      } catch (e) {
+        log('Erro accept: ' + e.message);
+      }
+    };
+
+    document.getElementById('end').onclick = async () => {
+      try {
+        await api(`/calls/${callId}`, { method: 'DELETE' });
+        if (pc) pc.close();
+        if (localStream) localStream.getTracks().forEach((t) => t.stop());
+        log('Chamada encerrada');
+      } catch (e) {
+        log('Erro end: ' + e.message);
+      }
+    };
+
+    // Permite colar call id de webhook incoming
+    document.getElementById('callId').addEventListener('input', (e) => {
+      callId = e.target.value;
+      document.getElementById('accept').disabled = !callId;
+      document.getElementById('end').disabled = !callId;
+    });
+  </script>
+</body>
+</html>

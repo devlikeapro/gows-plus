@@ -8,6 +8,7 @@ import (
 
 	"github.com/devlikeapro/gows/storage"
 	"github.com/devlikeapro/gows/storage/sqlstorage"
+	"github.com/devlikeapro/gows/voip/call"
 	"github.com/jellydator/ttlcache/v3"
 	_ "github.com/jackc/pgx/v5"     // Import the Postgres driver
 	_ "github.com/mattn/go-sqlite3" // Import the SQLite driver
@@ -36,6 +37,12 @@ type GoWS struct {
 	// This lets subsequent download attempts reuse the fresh DirectPath without
 	// sending another receipt, even if the first waiter already timed out.
 	mediaRetryEvents *ttlcache.Cache[types.MessageID, *events.MediaRetry]
+
+	callManager  *call.CallManager
+	callBridgeMu sync.Mutex
+	callBridge   callBridgeState
+	callOwnersMu sync.Mutex
+	callOwners   map[string]string
 }
 
 func (gows *GoWS) reissueEvent(event interface{}) {
@@ -73,6 +80,15 @@ func (gows *GoWS) reissueEvent(event interface{}) {
 			data = event
 		}
 
+	case *CallLifecycleEvent:
+		data = event
+
+	case *events.CallOffer, *events.CallReject, *events.CallAccept,
+		*events.CallTerminate, *events.CallTransport:
+		// Raw whatsmeow call events are still forwarded for debugging;
+		// WAHA should prefer CallLifecycleEvent payloads.
+		data = event
+
 	case *events.MediaRetry:
 		evt := event.(*events.MediaRetry)
 		// Always cache so that callers whose 60 s wait already expired can still
@@ -96,6 +112,7 @@ func (gows *GoWS) reissueEvent(event interface{}) {
 
 
 func (gows *GoWS) handleEvent(event interface{}) {
+	gows.routeCallEvent(event)
 	go gows.reissueEvent(event)
 	go gows.storageEventHandler.handleEvent(event)
 }
@@ -143,6 +160,8 @@ func (gows *GoWS) Stop() {
 	if gows.eventHandlerID != 0 {
 		gows.RemoveEventHandler(gows.eventHandlerID)
 	}
+
+	gows.cleanupCalls()
 
 	gows.Disconnect()
 	if gows.mediaRetryEvents != nil {
@@ -215,6 +234,11 @@ func BuildSession(
 		0,
 		sync.Map{},
 		retryEventsCache,
+		nil,
+		sync.Mutex{},
+		callBridgeState{},
+		sync.Mutex{},
+		make(map[string]string),
 	}
 	if storageCfg == (StorageConfig{}) {
 		storageCfg = DefaultStorageConfig()

@@ -174,6 +174,11 @@ service MessageService {
   // Calls
   //
   rpc RejectCall(RejectCallRequest) returns (Empty);
+  rpc StartCall(StartCallRequest) returns (StartCallResponse);
+  rpc AcceptCall(AcceptCallRequest) returns (Empty);
+  rpc EndCall(EndCallRequest) returns (Empty);
+  rpc ExchangeCallWebRTC(ExchangeCallWebRTCRequest) returns (ExchangeCallWebRTCResponse);
+  rpc GetCallState(Session) returns (CallStateResponse);
 
   //
   // Storage
@@ -781,6 +786,46 @@ message RejectCallRequest {
   Session session = 1;
   string from = 2;
   string id = 3;
+}
+
+message StartCallRequest {
+  Session session = 1;
+  string jid = 2;
+  bool video = 3;
+}
+
+message StartCallResponse {
+  string call_id = 1;
+}
+
+message AcceptCallRequest {
+  Session session = 1;
+  string call_id = 2;
+  optional string owner_id = 3;
+}
+
+message EndCallRequest {
+  Session session = 1;
+  string call_id = 2;
+}
+
+message ExchangeCallWebRTCRequest {
+  Session session = 1;
+  string call_id = 2;
+  string sdp_offer = 3;
+}
+
+message ExchangeCallWebRTCResponse {
+  string sdp_answer = 1;
+}
+
+message CallStateResponse {
+  bool active = 1;
+  string call_id = 2;
+  string from = 3;
+  string direction = 4;
+  string status = 5;
+  string event = 6;
 }
 
 //
