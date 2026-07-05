@@ -20,6 +20,8 @@ github.com/aws/aws-sdk-go v1.55.5 h1:KKUZBfBoyqy5d3swXyiC7Q76ic40rYcbqH7qjh59kzU
 github.com/aws/aws-sdk-go v1.55.5/go.mod h1:eRwEWoyTWFMVYVQzKMNHWP5/RV4xIUGMQfXQHfHkpNU=
 github.com/beeper/argo-go v1.1.2 h1:UQI2G8F+NLfGTOmTUI0254pGKx/HUU/etbUGTJv91Fs=
 github.com/beeper/argo-go v1.1.2/go.mod h1:M+LJAnyowKVQ6Rdj6XYGEn+qcVFkb3R/MUpqkGR0hM4=
+github.com/bergpinheiro/whatsmeow v0.0.0-20260704155659-f33a5faa5a20 h1:Ctb3UE2wfF7WL+8rAmThgFMJMxrgIZhPWUupImY6/As=
+github.com/bergpinheiro/whatsmeow v0.0.0-20260704155659-f33a5faa5a20/go.mod h1:9dmNTYZ/1pHjPw/bz+azBsGjAkcrZbqzMrKcvG5bJ8U=
 github.com/caarlos0/env/v11 v11.4.0 h1:Kcb6t5kIIr4XkoQC9AF2j+8E1Jsrl3Wz/hhm1LtoGAc=
 github.com/caarlos0/env/v11 v11.4.0/go.mod h1:qupehSf/Y0TUTsxKywqRt/vJjN5nz6vauiYEUUr8P4U=
 github.com/coder/websocket v1.8.15 h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=
@@ -29,8 +31,6 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/devlikeapro/goscraper v0.0.0-20260224081950-3e513f796e42 h1:Tn2PllrFPMnXIh2Jyyp7QZX1TYz1XeoJmrrdmgJoEWA=
 github.com/devlikeapro/goscraper v0.0.0-20260224081950-3e513f796e42/go.mod h1:Ezk+40Xo1pBhyjQxDWnPpujW7munML5zGsdecYMi43o=
-github.com/devlikeapro/whatsmeow v0.0.0-20260627093951-2c5be6382f6d h1:bl0ZIfBIxJNHEh4d+YM5cAskNxPyw2PuAfEkkoI/gqs=
-github.com/devlikeapro/whatsmeow v0.0.0-20260627093951-2c5be6382f6d/go.mod h1:9dmNTYZ/1pHjPw/bz+azBsGjAkcrZbqzMrKcvG5bJ8U=
 github.com/dhui/dktest v0.4.5 h1:uUfYBIVREmj/Rw6MvgmqNAYzTiKOHJak+enB5Di73MM=
 github.com/dhui/dktest v0.4.5/go.mod h1:tmcyeHDKagvlDrz7gDKq4UAJOLIfVZYkfD5OnHDwcCo=
 github.com/disintegration/imaging v1.6.2/go.mod h1:44/5580QXChDfwIclfc/PCwrr44amcmDAg8hxG0Ewe4=

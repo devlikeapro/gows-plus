@@ -74,6 +74,8 @@ service MessageService {
   rpc StopSession(Session) returns (Empty);
   rpc GetSessionState(Session) returns (SessionStateResponse);
   rpc RequestCode(PairCodeRequest) returns (PairCodeResponse);
+  rpc SubmitPasskeyResponse(PasskeyResponseRequest) returns (Empty);
+  rpc ConfirmPasskey(Session) returns (Empty);
   rpc Logout(Session) returns (Empty);
   //
   // Profile
@@ -199,6 +201,13 @@ message PairCodeRequest {
 
 message PairCodeResponse {
   string code = 1;
+}
+
+// WebAuthn/passkey assertion (whatsmeow types.WebAuthnResponse marshaled as JSON)
+// sent back to finish the passkey linking step (SendPasskeyResponse).
+message PasskeyResponseRequest {
+  Session session = 1;
+  string response_json = 2;
 }
 
 message Empty {}
