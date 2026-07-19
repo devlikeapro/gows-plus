@@ -8,6 +8,7 @@ import (
 	"github.com/devlikeapro/gows/server"
 	"github.com/devlikeapro/gows/wrpc"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
+	"go.mau.fi/whatsmeow"
 	waLog "go.mau.fi/whatsmeow/util/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -99,6 +100,31 @@ func remove(path string) {
 	_ = os.Remove(path)
 }
 
+// applyKeepAliveConfig overrides whatsmeow's global websocket keepalive ping
+// interval from env. whatsmeow pings on a random interval in [min, max)
+// (default 20-30s). Behind proxies that reap idle tunnels sooner, the ping
+// lands on a dead socket every time, causing constant "Keepalive timed out"
+// reconnect loops. Lowering the interval keeps the tunnel warm. Unset values
+// (0) leave the whatsmeow default in place.
+func applyKeepAliveConfig(log waLog.Logger, cfg KeepAliveConfig) {
+	if cfg.IntervalMinSec == 0 && cfg.IntervalMaxSec == 0 {
+		return
+	}
+	if cfg.IntervalMinSec > 0 {
+		whatsmeow.KeepAliveIntervalMin = time.Duration(cfg.IntervalMinSec) * time.Second
+	}
+	if cfg.IntervalMaxSec > 0 {
+		whatsmeow.KeepAliveIntervalMax = time.Duration(cfg.IntervalMaxSec) * time.Second
+	}
+	// whatsmeow picks a random interval in [min, max); max must be strictly
+	// greater than min or rand.Int64N panics at ping time.
+	if whatsmeow.KeepAliveIntervalMax <= whatsmeow.KeepAliveIntervalMin {
+		whatsmeow.KeepAliveIntervalMax = whatsmeow.KeepAliveIntervalMin + 10*time.Second
+		log.Warnf("Keepalive max interval <= min; adjusted max to %s", whatsmeow.KeepAliveIntervalMax)
+	}
+	log.Infof("Using keepalive ping interval: min=%s max=%s", whatsmeow.KeepAliveIntervalMin, whatsmeow.KeepAliveIntervalMax)
+}
+
 func main() {
 	flag.Parse()
 	log := gowsLog.Stdout("Server", "DEBUG", false)
@@ -117,6 +143,8 @@ func main() {
 	clientCfg := getClientConfig()
 	log.Infof("Using device name: '%s', browser name: '%s'", clientCfg.DeviceName, clientCfg.BrowserName)
 	gows.SetDeviceAndBrowser(clientCfg.DeviceName, clientCfg.BrowserName)
+
+	applyKeepAliveConfig(log, getKeepAliveConfig())
 
 	// Build the server
 	grpcServer := buildGrpcServer(log)

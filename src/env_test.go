@@ -117,3 +117,22 @@ func TestFullSyncDaysLimit_Value(t *testing.T) {
 		t.Fatalf("expected Value=30, got %v", cfg.FullSyncDaysLimit.Value)
 	}
 }
+
+func TestKeepAliveConfig_NotSet(t *testing.T) {
+	cfg := getKeepAliveConfig()
+	if cfg.IntervalMinSec != 0 || cfg.IntervalMaxSec != 0 {
+		t.Fatalf("expected 0/0 when unset, got %d/%d", cfg.IntervalMinSec, cfg.IntervalMaxSec)
+	}
+}
+
+func TestKeepAliveConfig_Values(t *testing.T) {
+	t.Setenv("WAHA_GOWS_KEEPALIVE_INTERVAL_MIN_SEC", "8")
+	t.Setenv("WAHA_GOWS_KEEPALIVE_INTERVAL_MAX_SEC", "12")
+	cfg := getKeepAliveConfig()
+	if cfg.IntervalMinSec != 8 {
+		t.Fatalf("expected min=8, got %d", cfg.IntervalMinSec)
+	}
+	if cfg.IntervalMaxSec != 12 {
+		t.Fatalf("expected max=12, got %d", cfg.IntervalMaxSec)
+	}
+}
