@@ -100,12 +100,6 @@ func remove(path string) {
 	_ = os.Remove(path)
 }
 
-// applyKeepAliveConfig overrides whatsmeow's global websocket keepalive ping
-// interval from env. whatsmeow pings on a random interval in [min, max)
-// (default 20-30s). Behind proxies that reap idle tunnels sooner, the ping
-// lands on a dead socket every time, causing constant "Keepalive timed out"
-// reconnect loops. Lowering the interval keeps the tunnel warm. Unset values
-// (0) leave the whatsmeow default in place.
 func applyKeepAliveConfig(log waLog.Logger, cfg KeepAliveConfig) {
 	if cfg.IntervalMinSec == 0 && cfg.IntervalMaxSec == 0 {
 		return
