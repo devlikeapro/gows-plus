@@ -123,6 +123,12 @@ service MessageService {
   rpc MarkChatUnread(ChatUnreadRequest) returns (Empty);
 
   //
+  // Account
+  //
+  // Fetch the account's current new-chat message capping (per-cycle quota).
+  rpc FetchMessageCapping(Session) returns (Json);
+
+  //
   // Message
   //
   rpc GenerateNewMessageID (Session) returns (NewMessageIDResponse);
