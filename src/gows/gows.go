@@ -60,6 +60,15 @@ func (gows *GoWS) reissueEvent(event interface{}) {
 		// Actively fetch the current reachout timelock state, so the session
 		// learns it right after (re)start without waiting for a push notification.
 		go gows.fetchReachoutTimelock()
+		// Same for the new-chat message capping (there is no push for it).
+		go gows.fetchMessageCapping()
+
+	case *events.NotifyAccountReachoutTimelock:
+		// The timelock and the new-chat capping are siblings in WhatsApp's
+		// cold-outreach limiting, so refresh the capping whenever the timelock
+		// changes (WhatsApp pushes no capping notification of its own).
+		go gows.fetchMessageCapping()
+		data = event
 
 	case *events.Message:
 		msg := event.(*events.Message)
@@ -171,6 +180,21 @@ func (gows *GoWS) fetchReachoutTimelock() {
 	result, err := gows.FetchAccountReachoutTimelock(ctx)
 	if err != nil {
 		gows.Log.Errorf("Failed to fetch account reachout timelock: %v", err)
+		return
+	}
+	gows.emitEvent(result)
+}
+
+// fetchMessageCapping fetches the current new-chat message capping state and
+// re-emits it as *MessageCapping, so the API side can track the account's
+// per-cycle quota. Called on connect and whenever the reachout timelock changes.
+func (gows *GoWS) fetchMessageCapping() {
+	ctx, cancel := context.WithTimeout(gows.Context, 30*time.Second)
+	defer cancel()
+
+	result, err := gows.FetchMessageCapping(ctx, MessageCappingTypeNewChatThread)
+	if err != nil {
+		gows.Log.Errorf("Failed to fetch message capping: %v", err)
 		return
 	}
 	gows.emitEvent(result)
