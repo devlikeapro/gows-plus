@@ -509,6 +509,43 @@ func (s *Server) SendMessage(ctx context.Context, req *__.MessageRequest) (*__.M
 					DocumentMessage: documentMessage,
 				},
 			}
+		case __.MediaType_STICKER:
+			// Stickers use the image upload path in whatsmeow
+			// (StickerMessage maps to MediaImage).
+			if !media.IsWebP(req.Media.Content) {
+				return nil, fmt.Errorf("sticker must be a WebP file (image/webp)")
+			}
+			mediaType = whatsmeow.MediaImage
+			mediaResponse, err = cli.UploadMedia(ctx, jid, req.Media.Content, mediaType)
+			if err != nil {
+				return nil, err
+			}
+
+			imgSize, err := media.CurrentSize(req.Media.Content)
+			if err != nil {
+				cli.Log.Errorf("Failed to get sticker dimensions: %v", err)
+			}
+
+			mimetype := req.Media.Mimetype
+			if mimetype == "" {
+				mimetype = "image/webp"
+			}
+			isAnimated := media.IsAnimatedWebP(req.Media.Content)
+			mediaKeyTimestamp := time.Now().Unix()
+			message.StickerMessage = &waE2E.StickerMessage{
+				Mimetype:          proto.String(mimetype),
+				URL:               &mediaResponse.URL,
+				DirectPath:        &mediaResponse.DirectPath,
+				FileSHA256:        mediaResponse.FileSHA256,
+				FileEncSHA256:     mediaResponse.FileEncSHA256,
+				MediaKey:          mediaResponse.MediaKey,
+				FileLength:        &mediaResponse.FileLength,
+				Height:            proto.Uint32(imgSize.Height),
+				Width:             proto.Uint32(imgSize.Width),
+				IsAnimated:        proto.Bool(isAnimated),
+				MediaKeyTimestamp: proto.Int64(mediaKeyTimestamp),
+			}
+			message.StickerMessage.ContextInfo = contextInfo
 		}
 
 		// Newsletters
