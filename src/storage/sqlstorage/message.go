@@ -107,6 +107,10 @@ func (s SqlMessageStore) GetMessageWithRetries(id types.MessageID) (msg *storage
 			return nil
 		},
 		retry.Attempts(6),
+		// Without this the caller gets retry's own list type, which has no
+		// Unwrap - so errors.Is(err, storage.ErrNotFound) could never match and
+		// "not found" was indistinguishable from a database failure.
+		retry.LastErrorOnly(true),
 	)
 	return msg, err
 }

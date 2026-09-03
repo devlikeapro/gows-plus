@@ -109,22 +109,28 @@ func (s *Server) SendMessage(ctx context.Context, req *__.MessageRequest) (*__.M
 		// point. The context info built above still applies - it carries the
 		// disappearing settings of the chat we are sending to.
 		if fwd.GetMessageId() == "" {
-			return nil, fmt.Errorf("forward.messageId is required to forward a message")
+			return nil, status.Error(codes.InvalidArgument, "forward.messageId is required to forward a message")
 		}
 		stored, err := cli.Storage.Messages.GetMessageWithRetries(fwd.GetMessageId())
 		if err != nil {
-			// NotFound rather than a plain error so the caller can tell "you
-			// asked for a message that is not here" from "something broke".
-			// Also the path when the message storage is turned off for this
-			// session, in which case there is nothing to forward from.
-			return nil, status.Errorf(codes.NotFound, "failed to get message to forward '%s': %v", fwd.GetMessageId(), err)
+			// Coded so the caller can tell "the message is not here" from
+			// "something broke" - only the first is the caller's own doing.
+			var storageDisabled storage.StorageDisabledError
+			switch {
+			case errors.Is(err, storage.ErrNotFound):
+				return nil, status.Errorf(codes.NotFound, "message not found: '%s'", fwd.GetMessageId())
+			case errors.As(err, &storageDisabled):
+				return nil, status.Error(codes.FailedPrecondition, "message storage is disabled for this session, there is nothing to forward from")
+			default:
+				return nil, fmt.Errorf("failed to get message to forward '%s': %w", fwd.GetMessageId(), err)
+			}
 		}
-		if stored == nil {
+		if stored == nil || stored.Message == nil {
 			return nil, status.Errorf(codes.NotFound, "message not found: '%s'", fwd.GetMessageId())
 		}
 		message, err = gows.BuildForwardedMessage(stored.Message, contextInfo, fwd.GetForce())
 		if err != nil {
-			return nil, fmt.Errorf("failed to forward message '%s': %w", fwd.GetMessageId(), err)
+			return nil, status.Errorf(codes.InvalidArgument, "failed to forward message '%s': %v", fwd.GetMessageId(), err)
 		}
 	} else if req.GetPollVote() != nil {
 		vote := req.PollVote

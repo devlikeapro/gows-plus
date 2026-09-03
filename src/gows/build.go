@@ -268,35 +268,43 @@ func SetContextInfo(msg *waE2E.Message, info *waE2E.ContextInfo) bool {
 	return true
 }
 
-// ErrCannotForward is returned for content that has nowhere to carry the
-// forwarded markers - a reaction or a protocol message, for instance.
+// ErrCannotForward is returned for content with nowhere to carry the forwarded
+// markers - a reaction, for instance.
 var ErrCannotForward = errors.New("this message type cannot be forwarded")
 
+// ErrCannotForwardPoll is separate from ErrCannotForward because a poll is not
+// an unsupported type - it is one WhatsApp itself offers no way to forward.
+var ErrCannotForwardPoll = errors.New("a poll cannot be forwarded")
+
+func isPollCreation(msg *waE2E.Message) bool {
+	return msg.GetPollCreationMessage() != nil ||
+		msg.GetPollCreationMessageV2() != nil ||
+		msg.GetPollCreationMessageV3() != nil
+}
+
 // BuildForwardedMessage re-sends the content of an existing message, marked as
-// forwarded.
-//
-// Forwarding is not an operation in the protocol: it is the original content
-// sent again with two fields set on its ContextInfo. Media rides along
-// untouched - the keys and directPath are copied rather than uploaded again,
+// forwarded. Media is not uploaded again - the keys and directPath are copied,
 // which is what the official clients do.
 //
-// base carries what the send pipeline already worked out for the destination
-// chat, which today means the disappearing-message settings. The original's own
-// context - what it quoted, who it mentioned - is deliberately dropped: that
-// belonged to the conversation it came from.
+// base is taken over: it is mutated and embedded in the returned message. It
+// carries what the send pipeline worked out for the destination chat. The
+// original's own context - what it quoted, who it mentioned - is dropped on
+// purpose, since it belonged to the chat the message came from.
 func BuildForwardedMessage(original *events.Message, base *waE2E.ContextInfo, force bool) (*waE2E.Message, error) {
 	if original == nil || original.Message == nil {
 		return nil, ErrCannotForward
 	}
-	// The stored message is already unwrapped - view-once, ephemeral and the
-	// rest are peeled off by whatsmeow before the event is handed over - so
-	// what we clone here is the content itself.
-	content, ok := proto.Clone(original.Message).(*waE2E.Message)
-	if !ok || content == nil {
-		return nil, ErrCannotForward
+	// WhatsApp gives no way to forward a poll, and sending one anyway would
+	// build a poll whose votes nobody can read: the secret that decrypts them
+	// belongs to the original, and re-using it would tie the two together.
+	if isPollCreation(original.Message) {
+		return nil, ErrCannotForwardPoll
 	}
-	// Device lists and message secrets belong to the original delivery, not to
-	// this one; whatsmeow fills in its own.
+	// Already unwrapped: whatsmeow peels view-once, ephemeral and the rest off
+	// before handing the event over.
+	content := proto.Clone(original.Message).(*waE2E.Message)
+	// The device list and the message secret belong to the delivery this came
+	// from, not to the one being made now.
 	content.MessageContextInfo = nil
 
 	// Plain text has no room for a ContextInfo, so a forwarded text has to

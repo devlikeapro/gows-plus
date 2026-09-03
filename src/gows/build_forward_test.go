@@ -1,6 +1,7 @@
 package gows
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -175,8 +176,9 @@ func TestBuildForwardedMessage_RefusesEmptyMessage(t *testing.T) {
 	assert.Nil(t, out)
 }
 
-// The message handed over comes from the store, which caches it - mutating it
-// would corrupt the stored copy for every later read.
+// The caller's copy must come back untouched. Defensive today - the SQL store
+// unmarshals a fresh object per read - but the cost is one clone and the cure
+// for getting it wrong later is a corrupted stored message.
 func TestBuildForwardedMessage_DoesNotMutateTheOriginal(t *testing.T) {
 	original := incoming(&waE2E.Message{
 		Conversation:       proto.String("untouched"),
@@ -191,8 +193,76 @@ func TestBuildForwardedMessage_DoesNotMutateTheOriginal(t *testing.T) {
 	assert.NotNil(t, original.Message.MessageContextInfo, "the stored copy keeps its own secrets")
 }
 
-// The message secret belongs to the delivery it came from; whatsmeow puts a new
-// one on the message we are about to send.
+// SetContextInfo is the writing half of ContextInfoOf, and the two have to agree
+// on every type. Reading one the other cannot write means a forward refused for
+// no reason; writing one the other cannot read means the forwarding score is
+// read back as zero and the chain silently stops counting.
+//
+// Walked by reflection rather than listed by hand: a list only re-checks what
+// its author already knew, so a type added to one function and forgotten in the
+// other would keep the test green.
+func TestContextInfoHelpersStayInSync(t *testing.T) {
+	msgType := reflect.TypeOf(waE2E.Message{})
+	carriers := 0
+	for i := 0; i < msgType.NumField(); i++ {
+		field := msgType.Field(i)
+		if field.Type.Kind() != reflect.Ptr || field.Type.Elem().Kind() != reflect.Struct {
+			continue
+		}
+		if _, ok := field.Type.Elem().FieldByName("ContextInfo"); !ok {
+			continue
+		}
+		carriers++
+		t.Run(field.Name, func(t *testing.T) {
+			msg := &waE2E.Message{}
+			reflect.ValueOf(msg).Elem().Field(i).Set(reflect.New(field.Type.Elem()))
+
+			written := SetContextInfo(msg, &waE2E.ContextInfo{IsForwarded: proto.Bool(true)})
+			read := ContextInfoOf(msg) != nil
+			if written != read {
+				t.Fatalf(
+					"SetContextInfo=%v but ContextInfoOf=%v for %s - the two lists disagree",
+					written, read, field.Name,
+				)
+			}
+			if !written {
+				t.Skipf("%s can carry a ContextInfo but is not forwardable yet", field.Name)
+			}
+			assert.True(t, ContextInfoOf(msg).GetIsForwarded())
+		})
+	}
+	// Without this the test passes by walking nothing at all, which is how a
+	// broken reflection walk looks exactly like a clean run.
+	require.Greater(t, carriers, 15, "reflection found almost no ContextInfo carriers")
+}
+
+func TestSetContextInfo_RejectsWhatItCannotCarry(t *testing.T) {
+	// Plain text is the deliberate one: it has no ContextInfo field, which is
+	// why forwarding promotes it to an extended text message first.
+	assert.False(t, SetContextInfo(&waE2E.Message{Conversation: proto.String("x")}, &waE2E.ContextInfo{}))
+	assert.False(t, SetContextInfo(&waE2E.Message{}, &waE2E.ContextInfo{}))
+	assert.False(t, SetContextInfo(nil, &waE2E.ContextInfo{}))
+}
+
+// WhatsApp offers no way to forward a poll, so the API must not invent one.
+// Sending it anyway would produce a poll whose votes nobody can decrypt, and
+// report success - the expensive kind of failure.
+func TestBuildForwardedMessage_RefusesPolls(t *testing.T) {
+	for name, msg := range map[string]*waE2E.Message{
+		"v1": {PollCreationMessage: &waE2E.PollCreationMessage{Name: proto.String("p")}},
+		"v2": {PollCreationMessageV2: &waE2E.PollCreationMessage{Name: proto.String("p")}},
+		"v3": {PollCreationMessageV3: &waE2E.PollCreationMessage{Name: proto.String("p")}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out, err := BuildForwardedMessage(incoming(msg), nil, false)
+			assert.ErrorIs(t, err, ErrCannotForwardPoll)
+			assert.Nil(t, out)
+		})
+	}
+}
+
+// Everything else keeps losing it: the device list and the secret belong to the
+// delivery the message came from.
 func TestBuildForwardedMessage_DropsMessageContextInfo(t *testing.T) {
 	original := incoming(&waE2E.Message{
 		ImageMessage:       &waE2E.ImageMessage{MediaKey: []byte("k")},
@@ -203,46 +273,4 @@ func TestBuildForwardedMessage_DropsMessageContextInfo(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Nil(t, out.MessageContextInfo)
-}
-
-// SetContextInfo is the writing half of ContextInfoOf: whatever one can read,
-// the other has to be able to write, or a forward of that type loses its marker.
-func TestSetContextInfo_CoversWhatContextInfoOfReads(t *testing.T) {
-	samples := map[string]*waE2E.Message{
-		"extendedText":  {ExtendedTextMessage: &waE2E.ExtendedTextMessage{}},
-		"image":         {ImageMessage: &waE2E.ImageMessage{}},
-		"contact":       {ContactMessage: &waE2E.ContactMessage{}},
-		"location":      {LocationMessage: &waE2E.LocationMessage{}},
-		"video":         {VideoMessage: &waE2E.VideoMessage{}},
-		"ptv":           {PtvMessage: &waE2E.VideoMessage{}},
-		"audio":         {AudioMessage: &waE2E.AudioMessage{}},
-		"document":      {DocumentMessage: &waE2E.DocumentMessage{}},
-		"sticker":       {StickerMessage: &waE2E.StickerMessage{}},
-		"contactsArray": {ContactsArrayMessage: &waE2E.ContactsArrayMessage{}},
-		"template":      {TemplateMessage: &waE2E.TemplateMessage{}},
-		"list":          {ListMessage: &waE2E.ListMessage{}},
-		"poll":          {PollCreationMessage: &waE2E.PollCreationMessage{}},
-		"pollV2":        {PollCreationMessageV2: &waE2E.PollCreationMessage{}},
-		"pollV3":        {PollCreationMessageV3: &waE2E.PollCreationMessage{}},
-		"documentWithCaption": {DocumentWithCaptionMessage: &waE2E.FutureProofMessage{
-			Message: &waE2E.Message{DocumentMessage: &waE2E.DocumentMessage{}},
-		}},
-	}
-
-	info := &waE2E.ContextInfo{IsForwarded: proto.Bool(true)}
-	for name, msg := range samples {
-		t.Run(name, func(t *testing.T) {
-			require.True(t, SetContextInfo(msg, info), "should accept %s", name)
-			require.NotNil(t, ContextInfoOf(msg), "should read back %s", name)
-			assert.True(t, ContextInfoOf(msg).GetIsForwarded())
-		})
-	}
-}
-
-func TestSetContextInfo_RejectsWhatItCannotCarry(t *testing.T) {
-	// Plain text is the deliberate one: it has no ContextInfo field, which is
-	// why forwarding promotes it to an extended text message first.
-	assert.False(t, SetContextInfo(&waE2E.Message{Conversation: proto.String("x")}, &waE2E.ContextInfo{}))
-	assert.False(t, SetContextInfo(&waE2E.Message{}, &waE2E.ContextInfo{}))
-	assert.False(t, SetContextInfo(nil, &waE2E.ContextInfo{}))
 }
