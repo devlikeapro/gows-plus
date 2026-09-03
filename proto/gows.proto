@@ -409,6 +409,18 @@ message EventMessage {
   EventLocation location = 6;
 }
 
+// Forwards a message that already exists, instead of building a new one from
+// this request. The original content is re-sent as it is - media included,
+// without re-uploading it - carrying the markers that make clients show it as
+// forwarded.
+message ForwardOptions {
+  // ID of the message to forward, as the store holds it.
+  string messageId = 1;
+  // Forwarding your own message does not mark it as forwarded, the same way
+  // the official clients behave. Set this to mark it anyway.
+  bool force = 2;
+}
+
 message MessageRequest {
   Session session = 1;
   string jid = 2;
@@ -448,6 +460,10 @@ message MessageRequest {
   PollVoteMessage pollVote = 18;
 
   repeated string mentions = 19;
+
+  // Forward an existing message. When set, the content of this request is
+  // ignored - the original message is what gets sent.
+  ForwardOptions forward = 20;
 }
 
 message Row {

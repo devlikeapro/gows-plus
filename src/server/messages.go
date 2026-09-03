@@ -101,7 +101,28 @@ func (s *Server) SendMessage(ctx context.Context, req *__.MessageRequest) (*__.M
 		extra.ID = req.Id
 	}
 
-	if req.GetPollVote() != nil {
+	if fwd := req.GetForward(); fwd != nil {
+		// Forwarding replaces the content: what goes out is the original
+		// message, so anything this request says about content is beside the
+		// point. The context info built above still applies - it carries the
+		// disappearing settings of the chat we are sending to.
+		if fwd.GetMessageId() == "" {
+			return nil, fmt.Errorf("forward.messageId is required to forward a message")
+		}
+		stored, err := cli.Storage.Messages.GetMessageWithRetries(fwd.GetMessageId())
+		if err != nil {
+			// Also the path when the message storage is turned off for this
+			// session, in which case there is nothing to forward from.
+			return nil, fmt.Errorf("failed to get message to forward '%s': %w", fwd.GetMessageId(), err)
+		}
+		if stored == nil {
+			return nil, fmt.Errorf("message not found: '%s'", fwd.GetMessageId())
+		}
+		message, err = gows.BuildForwardedMessage(stored.Message, contextInfo, fwd.GetForce())
+		if err != nil {
+			return nil, fmt.Errorf("failed to forward message '%s': %w", fwd.GetMessageId(), err)
+		}
+	} else if req.GetPollVote() != nil {
 		vote := req.PollVote
 		if vote.Options == nil {
 			vote.Options = []string{}
