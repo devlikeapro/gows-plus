@@ -22,9 +22,14 @@ var MessageTable = Table{
 	OnConflict: []string{
 		"id",
 	},
+	// is_real must be refreshed: a message first stored before its content was
+	// decrypted is stamped is_real=false, and the re-upsert that brings the real
+	// content only rewrote data, leaving the column stale. GetAllMessages filters
+	// on the column, so such a message stayed invisible forever.
 	UpdateOnConflict: []string{
 		"timestamp",
 		"data",
+		"is_real",
 	},
 }
 
