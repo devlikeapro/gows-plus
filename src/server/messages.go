@@ -115,11 +115,10 @@ func (s *Server) SendMessage(ctx context.Context, req *__.MessageRequest) (*__.M
 		if err != nil {
 			// Coded so the caller can tell "the message is not here" from
 			// "something broke" - only the first is the caller's own doing.
-			var storageDisabled storage.StorageDisabledError
 			switch {
 			case errors.Is(err, storage.ErrNotFound):
 				return nil, status.Errorf(codes.NotFound, "message not found: '%s'", fwd.GetMessageId())
-			case errors.As(err, &storageDisabled):
+			case errors.Is(err, storage.ErrStorageDisabled):
 				return nil, status.Error(codes.FailedPrecondition, "message storage is disabled for this session, there is nothing to forward from")
 			default:
 				return nil, fmt.Errorf("failed to get message to forward '%s': %w", fwd.GetMessageId(), err)
@@ -758,8 +757,7 @@ func (s *Server) EditMessage(ctx context.Context, req *__.EditMessageRequest) (*
 	if err == nil && storedMsg != nil && storedMsg.Message != nil {
 		originalMessage = storedMsg.Message.Message
 	} else if err != nil {
-		var storageDisabledErr storage.StorageDisabledError
-		if !errors.Is(err, storage.ErrNotFound) && !errors.As(err, &storageDisabledErr) {
+		if !errors.Is(err, storage.ErrNotFound) && !errors.Is(err, storage.ErrStorageDisabled) {
 			cli.Log.Warnf("Failed to fetch original message %s for edit: %v", req.MessageId, err)
 		}
 	}

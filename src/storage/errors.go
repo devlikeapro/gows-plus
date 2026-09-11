@@ -1,20 +1,14 @@
 package storage
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 var ErrNotFound = errors.New("not found")
 
-type StorageDisabledError struct {
-	Name string
-}
+var ErrStorageDisabled = errors.New("storage disabled")
 
-func (e StorageDisabledError) Error() string {
-	if e.Name == "" {
-		return "storage disabled"
-	}
-	return "storage disabled: " + e.Name
-}
-
-func StorageDisabled(name string) StorageDisabledError {
-	return StorageDisabledError{Name: name}
+func StorageDisabled(name string) error {
+	return fmt.Errorf("%w: %s", ErrStorageDisabled, name)
 }
