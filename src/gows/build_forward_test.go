@@ -30,9 +30,6 @@ func outgoing(msg *waE2E.Message) *events.Message {
 	}
 }
 
-// Plain text has no ContextInfo field, so forwarding one has to promote it to an
-// extended text message. Without this the message goes out with no "forwarded"
-// marker at all, and nothing reports a problem.
 func TestBuildForwardedMessage_PromotesPlainTextToExtended(t *testing.T) {
 	original := incoming(&waE2E.Message{Conversation: proto.String("hello")})
 
@@ -46,8 +43,6 @@ func TestBuildForwardedMessage_PromotesPlainTextToExtended(t *testing.T) {
 	assert.EqualValues(t, 1, out.ExtendedTextMessage.ContextInfo.GetForwardingScore())
 }
 
-// Media is forwarded by re-sending the original keys, not by uploading it
-// again - that is what makes a forward cheap and what the official clients do.
 func TestBuildForwardedMessage_KeepsMediaKeys(t *testing.T) {
 	original := incoming(&waE2E.Message{
 		ImageMessage: &waE2E.ImageMessage{
@@ -72,8 +67,6 @@ func TestBuildForwardedMessage_KeepsMediaKeys(t *testing.T) {
 	assert.True(t, out.ImageMessage.ContextInfo.GetIsForwarded())
 }
 
-// The score travels with the message, so a chain of forwards keeps counting.
-// Clients show "forwarded many times" from 5 onwards.
 func TestBuildForwardedMessage_IncrementsExistingScore(t *testing.T) {
 	original := incoming(&waE2E.Message{
 		ExtendedTextMessage: &waE2E.ExtendedTextMessage{
@@ -91,8 +84,6 @@ func TestBuildForwardedMessage_IncrementsExistingScore(t *testing.T) {
 	assert.EqualValues(t, 5, out.ExtendedTextMessage.ContextInfo.GetForwardingScore())
 }
 
-// Forwarding something you sent yourself is not marked as forwarded, matching
-// the official clients.
 func TestBuildForwardedMessage_OwnMessageIsNotMarked(t *testing.T) {
 	original := outgoing(&waE2E.Message{Conversation: proto.String("mine")})
 
@@ -103,7 +94,6 @@ func TestBuildForwardedMessage_OwnMessageIsNotMarked(t *testing.T) {
 	assert.EqualValues(t, 0, out.ExtendedTextMessage.ContextInfo.GetForwardingScore())
 }
 
-// ...unless the caller asks for it.
 func TestBuildForwardedMessage_OwnMessageWithForce(t *testing.T) {
 	original := outgoing(&waE2E.Message{Conversation: proto.String("mine")})
 
@@ -114,8 +104,6 @@ func TestBuildForwardedMessage_OwnMessageWithForce(t *testing.T) {
 	assert.EqualValues(t, 1, out.ExtendedTextMessage.ContextInfo.GetForwardingScore())
 }
 
-// The disappearing-message settings worked out for the destination chat have to
-// survive - a forward into an ephemeral chat must still expire.
 func TestBuildForwardedMessage_KeepsDestinationContext(t *testing.T) {
 	original := incoming(&waE2E.Message{Conversation: proto.String("hi")})
 	base := &waE2E.ContextInfo{Expiration: proto.Uint32(604800)}
@@ -128,8 +116,6 @@ func TestBuildForwardedMessage_KeepsDestinationContext(t *testing.T) {
 	assert.True(t, ci.GetIsForwarded())
 }
 
-// A forward carries the content, not the conversation it came from: whatever the
-// original quoted or mentioned belongs to the other chat.
 func TestBuildForwardedMessage_DropsOriginalQuoteAndMentions(t *testing.T) {
 	original := incoming(&waE2E.Message{
 		ExtendedTextMessage: &waE2E.ExtendedTextMessage{
@@ -153,8 +139,6 @@ func TestBuildForwardedMessage_DropsOriginalQuoteAndMentions(t *testing.T) {
 	assert.True(t, ci.GetIsForwarded())
 }
 
-// Content with nowhere to carry the markers must be refused, not sent as a
-// forward that is not marked as one.
 func TestBuildForwardedMessage_RefusesUnsupportedContent(t *testing.T) {
 	original := incoming(&waE2E.Message{
 		ReactionMessage: &waE2E.ReactionMessage{Text: proto.String("👍")},
@@ -176,9 +160,6 @@ func TestBuildForwardedMessage_RefusesEmptyMessage(t *testing.T) {
 	assert.Nil(t, out)
 }
 
-// The caller's copy must come back untouched. Defensive today - the SQL store
-// unmarshals a fresh object per read - but the cost is one clone and the cure
-// for getting it wrong later is a corrupted stored message.
 func TestBuildForwardedMessage_DoesNotMutateTheOriginal(t *testing.T) {
 	original := incoming(&waE2E.Message{
 		Conversation:       proto.String("untouched"),
@@ -193,14 +174,7 @@ func TestBuildForwardedMessage_DoesNotMutateTheOriginal(t *testing.T) {
 	assert.NotNil(t, original.Message.MessageContextInfo, "the stored copy keeps its own secrets")
 }
 
-// SetContextInfo is the writing half of ContextInfoOf, and the two have to agree
-// on every type. Reading one the other cannot write means a forward refused for
-// no reason; writing one the other cannot read means the forwarding score is
-// read back as zero and the chain silently stops counting.
-//
-// Walked by reflection rather than listed by hand: a list only re-checks what
-// its author already knew, so a type added to one function and forgotten in the
-// other would keep the test green.
+// ContextInfoOf and SetContextInfo must cover the same types - walked by reflection so a new type can't be missed in one of them
 func TestContextInfoHelpersStayInSync(t *testing.T) {
 	msgType := reflect.TypeOf(waE2E.Message{})
 	carriers := 0
@@ -231,22 +205,15 @@ func TestContextInfoHelpersStayInSync(t *testing.T) {
 			assert.True(t, ContextInfoOf(msg).GetIsForwarded())
 		})
 	}
-	// Without this the test passes by walking nothing at all, which is how a
-	// broken reflection walk looks exactly like a clean run.
 	require.Greater(t, carriers, 15, "reflection found almost no ContextInfo carriers")
 }
 
 func TestSetContextInfo_RejectsWhatItCannotCarry(t *testing.T) {
-	// Plain text is the deliberate one: it has no ContextInfo field, which is
-	// why forwarding promotes it to an extended text message first.
 	assert.False(t, SetContextInfo(&waE2E.Message{Conversation: proto.String("x")}, &waE2E.ContextInfo{}))
 	assert.False(t, SetContextInfo(&waE2E.Message{}, &waE2E.ContextInfo{}))
 	assert.False(t, SetContextInfo(nil, &waE2E.ContextInfo{}))
 }
 
-// WhatsApp offers no way to forward a poll, so the API must not invent one.
-// Sending it anyway would produce a poll whose votes nobody can decrypt, and
-// report success - the expensive kind of failure.
 func TestBuildForwardedMessage_RefusesPolls(t *testing.T) {
 	for name, msg := range map[string]*waE2E.Message{
 		"v1": {PollCreationMessage: &waE2E.PollCreationMessage{Name: proto.String("p")}},
@@ -261,8 +228,6 @@ func TestBuildForwardedMessage_RefusesPolls(t *testing.T) {
 	}
 }
 
-// Everything else keeps losing it: the device list and the secret belong to the
-// delivery the message came from.
 func TestBuildForwardedMessage_DropsMessageContextInfo(t *testing.T) {
 	original := incoming(&waE2E.Message{
 		ImageMessage:       &waE2E.ImageMessage{MediaKey: []byte("k")},

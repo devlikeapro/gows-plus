@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/devlikeapro/gows/gows"
-	waBinary "go.mau.fi/whatsmeow/binary"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/devlikeapro/gows/gows"
+	waBinary "go.mau.fi/whatsmeow/binary"
 
 	"github.com/devlikeapro/gows/media"
 	__ "github.com/devlikeapro/gows/proto"
@@ -104,17 +105,12 @@ func (s *Server) SendMessage(ctx context.Context, req *__.MessageRequest) (*__.M
 	}
 
 	if fwd := req.GetForward(); fwd != nil {
-		// Forwarding replaces the content: what goes out is the original
-		// message, so anything this request says about content is beside the
-		// point. The context info built above still applies - it carries the
-		// disappearing settings of the chat we are sending to.
+		// Forward sends the original message; only contextInfo from above is reused
 		if fwd.GetMessageId() == "" {
 			return nil, status.Error(codes.InvalidArgument, "forward.messageId is required to forward a message")
 		}
 		stored, err := cli.Storage.Messages.GetMessageWithRetries(fwd.GetMessageId())
 		if err != nil {
-			// Coded so the caller can tell "the message is not here" from
-			// "something broke" - only the first is the caller's own doing.
 			switch {
 			case errors.Is(err, storage.ErrNotFound):
 				return nil, status.Errorf(codes.NotFound, "message not found: '%s'", fwd.GetMessageId())

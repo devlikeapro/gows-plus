@@ -171,9 +171,7 @@ func ExtractContextInfo(event *events.Message) *waE2E.ContextInfo {
 	return ContextInfoOf(event.Message)
 }
 
-// ContextInfoOf returns the ContextInfo of whatever content the message holds.
-// A plain text Conversation has nowhere to keep one, so it returns nil - see
-// BuildForwardedMessage for what that costs.
+// ContextInfoOf returns the ContextInfo of the message content, nil for plain text
 func ContextInfoOf(msg *waE2E.Message) *waE2E.ContextInfo {
 	if msg == nil {
 		return nil
@@ -218,13 +216,7 @@ func ContextInfoOf(msg *waE2E.Message) *waE2E.ContextInfo {
 	}
 }
 
-// SetContextInfo attaches info to whatever content the message holds, and says
-// whether it found somewhere to put it. Callers must refuse a false rather than
-// send a message that quietly lost its context.
-//
-// This is the writing half of ContextInfoOf. It cannot be expressed in terms of
-// that one: when a message arrives with no ContextInfo at all there is no
-// pointer to write through.
+// SetContextInfo attaches info to the message content, false if it can't carry one
 func SetContextInfo(msg *waE2E.Message, info *waE2E.ContextInfo) bool {
 	if msg == nil {
 		return false
@@ -268,12 +260,8 @@ func SetContextInfo(msg *waE2E.Message, info *waE2E.ContextInfo) bool {
 	return true
 }
 
-// ErrCannotForward is returned for content with nowhere to carry the forwarded
-// markers - a reaction, for instance.
 var ErrCannotForward = errors.New("this message type cannot be forwarded")
 
-// ErrCannotForwardPoll is separate from ErrCannotForward because a poll is not
-// an unsupported type - it is one WhatsApp itself offers no way to forward.
 var ErrCannotForwardPoll = errors.New("a poll cannot be forwarded")
 
 func isPollCreation(msg *waE2E.Message) bool {
@@ -282,34 +270,22 @@ func isPollCreation(msg *waE2E.Message) bool {
 		msg.GetPollCreationMessageV3() != nil
 }
 
-// BuildForwardedMessage re-sends the content of an existing message, marked as
-// forwarded. Media is not uploaded again - the keys and directPath are copied,
-// which is what the official clients do.
-//
-// base is taken over: it is mutated and embedded in the returned message. It
-// carries what the send pipeline worked out for the destination chat. The
-// original's own context - what it quoted, who it mentioned - is dropped on
-// purpose, since it belonged to the chat the message came from.
+// BuildForwardedMessage builds a forwarded copy of original (media keys reused, not re-uploaded).
+// base is mutated and becomes the ContextInfo of the result; the original's quote and mentions are dropped.
 func BuildForwardedMessage(original *events.Message, base *waE2E.ContextInfo, force bool) (*waE2E.Message, error) {
 	if original == nil || original.Message == nil {
 		return nil, ErrCannotForward
 	}
-	// WhatsApp gives no way to forward a poll, and sending one anyway would
-	// build a poll whose votes nobody can read: the secret that decrypts them
-	// belongs to the original, and re-using it would tie the two together.
+	// Polls can't be forwarded - the votes' secret belongs to the original
 	if isPollCreation(original.Message) {
 		return nil, ErrCannotForwardPoll
 	}
-	// Already unwrapped: whatsmeow peels view-once, ephemeral and the rest off
-	// before handing the event over.
+	// original.Message is already unwrapped by whatsmeow (view-once, ephemeral, etc)
 	content := proto.Clone(original.Message).(*waE2E.Message)
-	// The device list and the message secret belong to the delivery this came
-	// from, not to the one being made now.
+	// Device list and message secret belong to the original delivery
 	content.MessageContextInfo = nil
 
-	// Plain text has no room for a ContextInfo, so a forwarded text has to
-	// travel as an extended one. Skipping this loses the "Forwarded" label
-	// without any error to show for it.
+	// Plain text has no ContextInfo - promote it to ExtendedTextMessage
 	if content.Conversation != nil {
 		content.ExtendedTextMessage = &waE2E.ExtendedTextMessage{
 			Text: proto.String(content.GetConversation()),
@@ -318,8 +294,7 @@ func BuildForwardedMessage(original *events.Message, base *waE2E.ContextInfo, fo
 	}
 
 	score := ContextInfoOf(content).GetForwardingScore()
-	// Forwarding your own message does not mark it, matching the official
-	// clients - which is why callers get a way to force it.
+	// Own messages are not marked as forwarded (like official clients) unless forced
 	if !original.Info.IsFromMe || force {
 		score++
 	}
