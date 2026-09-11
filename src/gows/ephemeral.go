@@ -68,7 +68,7 @@ func ExtractEphemeralSettingsFromMsg(event *events.Message) *storage.StoredChatE
 	if event.Info.Chat.Server != types.DefaultUserServer && event.Info.Chat.Server != types.HiddenUserServer {
 		return nil
 	}
-	contextInfo := ExtractContextInfo(event)
+	contextInfo := ExtractContextInfo(event.Message)
 	if contextInfo == nil {
 		return nil
 	}

@@ -83,7 +83,7 @@ func (gows *GoWS) BuildEditedMessage(
 			},
 		}
 	default:
-		var contextInfo = ExtractContextInfo(&events.Message{Message: originalMessage})
+		var contextInfo = ExtractContextInfo(originalMessage)
 		message := &waE2E.Message{
 			ExtendedTextMessage: &waE2E.ExtendedTextMessage{
 				Text:        proto.String(text),
@@ -164,15 +164,8 @@ func (gows *GoWS) PopulateContextInfoWithMentions(info *waE2E.ContextInfo, menti
 	return info
 }
 
-func ExtractContextInfo(event *events.Message) *waE2E.ContextInfo {
-	if event.Message == nil {
-		return nil
-	}
-	return ContextInfoOf(event.Message)
-}
-
-// ContextInfoOf returns the ContextInfo of the message content, nil for plain text
-func ContextInfoOf(msg *waE2E.Message) *waE2E.ContextInfo {
+// ExtractContextInfo returns the ContextInfo of the message content, nil for plain text
+func ExtractContextInfo(msg *waE2E.Message) *waE2E.ContextInfo {
 	if msg == nil {
 		return nil
 	}
@@ -293,7 +286,7 @@ func BuildForwardedMessage(original *events.Message, base *waE2E.ContextInfo, fo
 		content.Conversation = nil
 	}
 
-	score := ContextInfoOf(content).GetForwardingScore()
+	score := ExtractContextInfo(content).GetForwardingScore()
 	// Own messages are not marked as forwarded (like official clients) unless forced
 	if !original.Info.IsFromMe || force {
 		score++

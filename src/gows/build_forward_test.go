@@ -174,7 +174,7 @@ func TestBuildForwardedMessage_DoesNotMutateTheOriginal(t *testing.T) {
 	assert.NotNil(t, original.Message.MessageContextInfo, "the stored copy keeps its own secrets")
 }
 
-// ContextInfoOf and SetContextInfo must cover the same types - walked by reflection so a new type can't be missed in one of them
+// ExtractContextInfo and SetContextInfo must cover the same types - walked by reflection so a new type can't be missed in one of them
 func TestContextInfoHelpersStayInSync(t *testing.T) {
 	msgType := reflect.TypeOf(waE2E.Message{})
 	carriers := 0
@@ -192,17 +192,17 @@ func TestContextInfoHelpersStayInSync(t *testing.T) {
 			reflect.ValueOf(msg).Elem().Field(i).Set(reflect.New(field.Type.Elem()))
 
 			written := SetContextInfo(msg, &waE2E.ContextInfo{IsForwarded: proto.Bool(true)})
-			read := ContextInfoOf(msg) != nil
+			read := ExtractContextInfo(msg) != nil
 			if written != read {
 				t.Fatalf(
-					"SetContextInfo=%v but ContextInfoOf=%v for %s - the two lists disagree",
+					"SetContextInfo=%v but ExtractContextInfo=%v for %s - the two lists disagree",
 					written, read, field.Name,
 				)
 			}
 			if !written {
 				t.Skipf("%s can carry a ContextInfo but is not forwardable yet", field.Name)
 			}
-			assert.True(t, ContextInfoOf(msg).GetIsForwarded())
+			assert.True(t, ExtractContextInfo(msg).GetIsForwarded())
 		})
 	}
 	require.Greater(t, carriers, 15, "reflection found almost no ContextInfo carriers")
