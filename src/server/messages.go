@@ -17,6 +17,8 @@ import (
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -101,7 +103,36 @@ func (s *Server) SendMessage(ctx context.Context, req *__.MessageRequest) (*__.M
 		extra.ID = req.Id
 	}
 
-	if req.GetPollVote() != nil {
+	if fwd := req.GetForward(); fwd != nil {
+		// Forwarding replaces the content: what goes out is the original
+		// message, so anything this request says about content is beside the
+		// point. The context info built above still applies - it carries the
+		// disappearing settings of the chat we are sending to.
+		if fwd.GetMessageId() == "" {
+			return nil, status.Error(codes.InvalidArgument, "forward.messageId is required to forward a message")
+		}
+		stored, err := cli.Storage.Messages.GetMessageWithRetries(fwd.GetMessageId())
+		if err != nil {
+			// Coded so the caller can tell "the message is not here" from
+			// "something broke" - only the first is the caller's own doing.
+			var storageDisabled storage.StorageDisabledError
+			switch {
+			case errors.Is(err, storage.ErrNotFound):
+				return nil, status.Errorf(codes.NotFound, "message not found: '%s'", fwd.GetMessageId())
+			case errors.As(err, &storageDisabled):
+				return nil, status.Error(codes.FailedPrecondition, "message storage is disabled for this session, there is nothing to forward from")
+			default:
+				return nil, fmt.Errorf("failed to get message to forward '%s': %w", fwd.GetMessageId(), err)
+			}
+		}
+		if stored == nil || stored.Message == nil {
+			return nil, status.Errorf(codes.NotFound, "message not found: '%s'", fwd.GetMessageId())
+		}
+		message, err = gows.BuildForwardedMessage(stored.Message, contextInfo, fwd.GetForce())
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "failed to forward message '%s': %v", fwd.GetMessageId(), err)
+		}
+	} else if req.GetPollVote() != nil {
 		vote := req.PollVote
 		if vote.Options == nil {
 			vote.Options = []string{}

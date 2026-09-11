@@ -1,6 +1,7 @@
 package gows
 
 import (
+	"errors"
 	"time"
 
 	"go.mau.fi/whatsmeow/appstate"
@@ -167,7 +168,16 @@ func ExtractContextInfo(event *events.Message) *waE2E.ContextInfo {
 	if event.Message == nil {
 		return nil
 	}
-	msg := event.Message
+	return ContextInfoOf(event.Message)
+}
+
+// ContextInfoOf returns the ContextInfo of whatever content the message holds.
+// A plain text Conversation has nowhere to keep one, so it returns nil - see
+// BuildForwardedMessage for what that costs.
+func ContextInfoOf(msg *waE2E.Message) *waE2E.ContextInfo {
+	if msg == nil {
+		return nil
+	}
 	switch {
 	case msg.Conversation != nil:
 		return nil
@@ -206,6 +216,126 @@ func ExtractContextInfo(event *events.Message) *waE2E.ContextInfo {
 	default:
 		return nil
 	}
+}
+
+// SetContextInfo attaches info to whatever content the message holds, and says
+// whether it found somewhere to put it. Callers must refuse a false rather than
+// send a message that quietly lost its context.
+//
+// This is the writing half of ContextInfoOf. It cannot be expressed in terms of
+// that one: when a message arrives with no ContextInfo at all there is no
+// pointer to write through.
+func SetContextInfo(msg *waE2E.Message, info *waE2E.ContextInfo) bool {
+	if msg == nil {
+		return false
+	}
+	switch {
+	case msg.ExtendedTextMessage != nil:
+		msg.ExtendedTextMessage.ContextInfo = info
+	case msg.ImageMessage != nil:
+		msg.ImageMessage.ContextInfo = info
+	case msg.ContactMessage != nil:
+		msg.ContactMessage.ContextInfo = info
+	case msg.LocationMessage != nil:
+		msg.LocationMessage.ContextInfo = info
+	case msg.VideoMessage != nil:
+		msg.VideoMessage.ContextInfo = info
+	case msg.PtvMessage != nil:
+		msg.PtvMessage.ContextInfo = info
+	case msg.AudioMessage != nil:
+		msg.AudioMessage.ContextInfo = info
+	case msg.DocumentMessage != nil:
+		msg.DocumentMessage.ContextInfo = info
+	case msg.DocumentWithCaptionMessage != nil && msg.DocumentWithCaptionMessage.Message != nil && msg.DocumentWithCaptionMessage.Message.DocumentMessage != nil:
+		msg.DocumentWithCaptionMessage.Message.DocumentMessage.ContextInfo = info
+	case msg.StickerMessage != nil:
+		msg.StickerMessage.ContextInfo = info
+	case msg.ContactsArrayMessage != nil:
+		msg.ContactsArrayMessage.ContextInfo = info
+	case msg.TemplateMessage != nil:
+		msg.TemplateMessage.ContextInfo = info
+	case msg.ListMessage != nil:
+		msg.ListMessage.ContextInfo = info
+	case msg.PollCreationMessage != nil:
+		msg.PollCreationMessage.ContextInfo = info
+	case msg.PollCreationMessageV2 != nil:
+		msg.PollCreationMessageV2.ContextInfo = info
+	case msg.PollCreationMessageV3 != nil:
+		msg.PollCreationMessageV3.ContextInfo = info
+	default:
+		return false
+	}
+	return true
+}
+
+// ErrCannotForward is returned for content with nowhere to carry the forwarded
+// markers - a reaction, for instance.
+var ErrCannotForward = errors.New("this message type cannot be forwarded")
+
+// ErrCannotForwardPoll is separate from ErrCannotForward because a poll is not
+// an unsupported type - it is one WhatsApp itself offers no way to forward.
+var ErrCannotForwardPoll = errors.New("a poll cannot be forwarded")
+
+func isPollCreation(msg *waE2E.Message) bool {
+	return msg.GetPollCreationMessage() != nil ||
+		msg.GetPollCreationMessageV2() != nil ||
+		msg.GetPollCreationMessageV3() != nil
+}
+
+// BuildForwardedMessage re-sends the content of an existing message, marked as
+// forwarded. Media is not uploaded again - the keys and directPath are copied,
+// which is what the official clients do.
+//
+// base is taken over: it is mutated and embedded in the returned message. It
+// carries what the send pipeline worked out for the destination chat. The
+// original's own context - what it quoted, who it mentioned - is dropped on
+// purpose, since it belonged to the chat the message came from.
+func BuildForwardedMessage(original *events.Message, base *waE2E.ContextInfo, force bool) (*waE2E.Message, error) {
+	if original == nil || original.Message == nil {
+		return nil, ErrCannotForward
+	}
+	// WhatsApp gives no way to forward a poll, and sending one anyway would
+	// build a poll whose votes nobody can read: the secret that decrypts them
+	// belongs to the original, and re-using it would tie the two together.
+	if isPollCreation(original.Message) {
+		return nil, ErrCannotForwardPoll
+	}
+	// Already unwrapped: whatsmeow peels view-once, ephemeral and the rest off
+	// before handing the event over.
+	content := proto.Clone(original.Message).(*waE2E.Message)
+	// The device list and the message secret belong to the delivery this came
+	// from, not to the one being made now.
+	content.MessageContextInfo = nil
+
+	// Plain text has no room for a ContextInfo, so a forwarded text has to
+	// travel as an extended one. Skipping this loses the "Forwarded" label
+	// without any error to show for it.
+	if content.Conversation != nil {
+		content.ExtendedTextMessage = &waE2E.ExtendedTextMessage{
+			Text: proto.String(content.GetConversation()),
+		}
+		content.Conversation = nil
+	}
+
+	score := ContextInfoOf(content).GetForwardingScore()
+	// Forwarding your own message does not mark it, matching the official
+	// clients - which is why callers get a way to force it.
+	if !original.Info.IsFromMe || force {
+		score++
+	}
+
+	info := base
+	if info == nil {
+		info = &waE2E.ContextInfo{}
+	}
+	if score > 0 {
+		info.IsForwarded = proto.Bool(true)
+		info.ForwardingScore = proto.Uint32(score)
+	}
+	if !SetContextInfo(content, info) {
+		return nil, ErrCannotForward
+	}
+	return content, nil
 }
 
 type Contact struct {
