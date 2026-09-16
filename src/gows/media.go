@@ -56,11 +56,13 @@ func (gows *GoWS) downloadAnyMedia(ctx context.Context, msg *waE2E.Message, down
 	}
 }
 
-// DownloadAnyMediaWithRetry wraps DownloadAnyMedia and, on HTTP 403 or a CDN
+// DownloadAnyMediaWithRetry wraps DownloadAnyMedia and, on HTTP 403/404/410 or a CDN
 // hash mismatch (ErrInvalidMediaEncSHA256), requests the sender's phone to
 // re-upload the media via whatsmeow's media-retry protocol.
 // On a successful retry the fresh DirectPath is used for a second download attempt.
 //
+// 404/410 mean the CDN dropped the object (media older than ~3 weeks) - WhatsApp Web
+// asks the phone to re-upload in that case too.
 // ErrInvalidMediaEncSHA256 ("hash of media ciphertext doesn't match") means the
 // CDN object at the message's directPath has been replaced with a different upload
 // (e.g. a forwarded image whose original CDN slot was recycled).  The phone
@@ -91,6 +93,8 @@ func (gows *GoWS) DownloadAnyMediaWithRetry(
 	}
 
 	retriable := errors.Is(err, whatsmeow.ErrMediaDownloadFailedWith403) ||
+		errors.Is(err, whatsmeow.ErrMediaDownloadFailedWith404) ||
+		errors.Is(err, whatsmeow.ErrMediaDownloadFailedWith410) ||
 		errors.Is(err, whatsmeow.ErrInvalidMediaEncSHA256)
 	if !retriable {
 		return data, err
