@@ -3,6 +3,8 @@ package sqlstorage
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/jmoiron/sqlx"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	waLog "go.mau.fi/whatsmeow/util/log"
@@ -81,6 +83,6 @@ func configurePsql(db *sqlx.DB) (err error) {
 	// We save history messages in the database in parallel, so we need to limit the number of connections
 	db.SetMaxOpenConns(10)
 	// Close idle connections after 30 seconds
-	db.SetConnMaxIdleTime(30)
+	db.SetConnMaxIdleTime(30 * time.Second)
 	return nil
 }
