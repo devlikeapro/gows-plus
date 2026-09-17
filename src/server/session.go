@@ -30,7 +30,17 @@ func (s *Server) StartSession(ctx context.Context, req *__.StartSessionRequest) 
 	case dialect == "sqlite3" || dialect == "sqlite":
 		// busy_timeout to prevent "database is locked" errors
 		// DO NOT add cache=shared, it's not safe
-		address = req.Config.Store.Address + "?_foreign_keys=on&_busy_timeout=30000"
+		//
+		// WAL is required here, not optional. In the default rollback-journal mode a
+		// single writer takes an exclusive lock that blocks every other reader and
+		// writer. During a status@broadcast the outgoing send and the flood of
+		// incoming decryptions (each a session/identity/sender-key write) contend for
+		// that one lock, exhaust the busy_timeout above and surface as "database is
+		// locked". WAL lets one writer proceed alongside readers, and
+		// _txlock=immediate takes the write lock up front so concurrent writers back
+		// off cleanly instead of deadlocking mid-transaction.
+		// (Mirrors the PRAGMAs already applied to the GContainer store.)
+		address = req.Config.Store.Address + "?_foreign_keys=on&_busy_timeout=30000&_journal_mode=WAL&_synchronous=NORMAL&_txlock=immediate"
 	case dialect == "postgres":
 		address = addApplicationName(req.Config.Store.Address, "GOWS")
 	default:
