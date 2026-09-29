@@ -24,3 +24,10 @@ tidy: build-proto
 build:
 	cd src && \
 	go build -o ../bin/gows .
+
+PG_TEST_DSN ?= postgres://postgres:postgres@127.0.0.1:55432/postgres?sslmode=disable
+
+test-pg:
+	docker run -d --rm --name gows-test-pg -e POSTGRES_PASSWORD=postgres -p 55432:5432 postgres:16
+	until docker exec gows-test-pg pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; do sleep 1; done
+	cd src && GOWS_TEST_PG_DSN="$(PG_TEST_DSN)" go test ./storage/sqlstorage/...; status=$$?; docker stop gows-test-pg; exit $$status
