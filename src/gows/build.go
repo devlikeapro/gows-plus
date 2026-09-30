@@ -344,10 +344,18 @@ func BuildContactsMessage(contacts []Contact, contextInfo *waE2E.ContextInfo) (m
 	return message
 }
 
-func BuildContactUpdate(jid types.JID, firstName, lastName string) appstate.PatchInfo {
+func BuildContactUpdate(jid types.JID, lid types.JID, firstName, lastName string) appstate.PatchInfo {
 	fullName := firstName
 	if lastName != "" {
 		fullName = firstName + " " + lastName
+	}
+	action := &waSyncAction.ContactAction{
+		FullName:                 proto.String(fullName),
+		FirstName:                proto.String(firstName),
+		SaveOnPrimaryAddressbook: proto.Bool(true),
+	}
+	if !lid.IsEmpty() {
+		action.LidJID = proto.String(lid.String())
 	}
 
 	return appstate.PatchInfo{
@@ -356,11 +364,7 @@ func BuildContactUpdate(jid types.JID, firstName, lastName string) appstate.Patc
 			Index:   []string{appstate.IndexContact, jid.String()},
 			Version: 2,
 			Value: &waSyncAction.SyncActionValue{
-				ContactAction: &waSyncAction.ContactAction{
-					FullName:                 proto.String(fullName),
-					FirstName:                proto.String(firstName),
-					SaveOnPrimaryAddressbook: proto.Bool(true),
-				},
+				ContactAction: action,
 			},
 		}},
 	}

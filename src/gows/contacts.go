@@ -3,14 +3,19 @@ package gows
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
-	"time"
 )
 
 func (gows *GoWS) UpdateContact(ctx context.Context, jid types.JID, firstname, lastname string) error {
-	patch := BuildContactUpdate(jid, firstname, lastname)
-	err := gows.SendAppState(ctx, patch)
+	lid, err := gows.ResolveLidByPN(ctx, jid)
+	if err != nil {
+		return fmt.Errorf("error resolving lid for %v: %w", jid, err)
+	}
+	patch := BuildContactUpdate(jid, lid, firstname, lastname)
+	err = gows.SendAppState(ctx, patch)
 	if err != nil {
 		return fmt.Errorf("error updating contact: %w", err)
 	}
