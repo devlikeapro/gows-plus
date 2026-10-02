@@ -6,6 +6,8 @@ type Table struct {
 	DataField        string
 	OnConflict       []string
 	UpdateOnConflict []string
+	// Optional condition for DO UPDATE; when false the conflicting row is left as is
+	UpdateOnConflictWhere string
 }
 
 var MessageTable = Table{
@@ -31,6 +33,9 @@ var MessageTable = Table{
 		"data",
 		"is_real",
 	},
+	// whatsmeow emits one event per enc child with the same id, so a key-only (SKDM) or other non-real event
+	// can land after the real content - it must never replace a real stored message (#2289)
+	UpdateOnConflictWhere: "NOT (gows_messages.is_real AND NOT EXCLUDED.is_real)",
 }
 
 var GroupTable = Table{
