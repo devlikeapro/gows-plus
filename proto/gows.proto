@@ -110,6 +110,7 @@ service MessageService {
   rpc SetGroupLocked(JidBoolRequest) returns (Empty); // change info only by admins
   rpc SetGroupAnnounce(JidBoolRequest) returns (Empty); // send messages only by admins
   rpc SetGroupMemberAddMode(JidBoolRequest) returns (Empty); // who can add members - true - all members, false - admins only
+  rpc SetGroupMemberShareHistoryMode(JidBoolRequest) returns (Empty); // who can share message history with new members - true - all members, false - admins only
   rpc UpdateGroupParticipants(UpdateParticipantsRequest) returns (JsonList);
   rpc SetGroupJoinApprovalMode(JidBoolRequest) returns (Empty);
   rpc GetGroupRequestParticipants(JidRequest) returns (JsonList);

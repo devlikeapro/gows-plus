@@ -264,6 +264,32 @@ func (s *Server) SetGroupMemberAddMode(ctx context.Context, req *__.JidBoolReque
 	return &__.Empty{}, nil
 }
 
+func (s *Server) SetGroupMemberShareHistoryMode(ctx context.Context, req *__.JidBoolRequest) (*__.Empty, error) {
+	cli, err := s.Sm.Get(req.GetSession().GetId())
+	if err != nil {
+		return nil, err
+	}
+	jid, err := types.ParseJID(req.GetJid())
+	if err != nil {
+		return nil, err
+	}
+	mode := types.GroupMemberShareHistoryModeAdmin
+	if req.GetValue() {
+		mode = types.GroupMemberShareHistoryModeAllMember
+	}
+	err = cli.SetGroupMemberShareHistoryMode(ctx, jid, mode)
+	if err != nil {
+		return nil, err
+	}
+	// No notification is parsed for this property, keep the cached group in sync
+	group, err := cli.Storage.Groups.GetGroup(jid)
+	if err == nil && group != nil {
+		group.MemberShareHistoryMode = mode
+		_ = cli.Storage.Groups.UpsertOneGroup(group)
+	}
+	return &__.Empty{}, nil
+}
+
 func (s *Server) UpdateGroupParticipants(ctx context.Context, req *__.UpdateParticipantsRequest) (*__.JsonList, error) {
 	cli, err := s.Sm.Get(req.GetSession().GetId())
 	if err != nil {
