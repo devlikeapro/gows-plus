@@ -138,6 +138,16 @@ func main() {
 	statusCfg := getStatusConfig()
 	log.Infof("Status broadcast participants batch size: %d", statusCfg.ParticipantsBatchSize)
 	gows.SetStatusParticipantsBatchSize(statusCfg.ParticipantsBatchSize)
+	log.Infof(
+		"Status broadcast batch ack timeout: %s, delay between batches: %s, retries: %d (backoff %s)",
+		statusCfg.BatchTimeout,
+		statusCfg.BatchDelay,
+		statusCfg.BatchMaxRetries,
+		statusCfg.BatchRetryBackoff,
+	)
+	gows.SetStatusBatchTimeout(statusCfg.BatchTimeout)
+	gows.SetStatusBatchDelay(statusCfg.BatchDelay)
+	gows.SetStatusBatchRetry(statusCfg.BatchMaxRetries, statusCfg.BatchRetryBackoff)
 
 	linkPreviewCfg := getLinkPreviewConfig()
 	log.Infof("Link preview fetch timeout: %s", linkPreviewCfg.FetchTimeout)

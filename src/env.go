@@ -24,8 +24,26 @@ func getClientConfig() ClientConfig {
 type StatusConfig struct {
 	// ParticipantsBatchSize controls how many contacts are included per batch
 	// when sending a status/story to status@broadcast.
-	// Lowered from 5000 to 500 to avoid gRPC batch timeout errors on large contact lists.
-	ParticipantsBatchSize int `env:"WAHA_GOWS_STATUS_PARTICIPANTS_BATCH_SIZE" envDefault:"500"`
+	// Kept large on purpose: what trips WhatsApp's rate limiting is the number of
+	// stanzas, not the number of participants inside one. Smaller batches turned
+	// the ack timeouts into "server returned error 429" instead of fixing them.
+	// Slow acks on a big batch are handled by BatchTimeout below.
+	ParticipantsBatchSize int `env:"WAHA_GOWS_STATUS_PARTICIPANTS_BATCH_SIZE" envDefault:"5000"`
+	// BatchTimeout bounds how long we wait for the server to acknowledge one
+	// batch. whatsmeow defaults to 75s, which is not enough for a large status
+	// batch and shows up as "timed out waiting for message send response" even
+	// though the batch is delivered.
+	// Go duration format: 90s, 180s, 5m.
+	BatchTimeout time.Duration `env:"WAHA_GOWS_STATUS_BATCH_TIMEOUT" envDefault:"180s"`
+	// BatchDelay is the pause between batches, so a large audience goes out at a
+	// steady cadence instead of as a burst of back-to-back stanzas.
+	BatchDelay time.Duration `env:"WAHA_GOWS_STATUS_BATCH_DELAY" envDefault:"1500ms"`
+	// BatchMaxRetries is how many extra attempts a batch gets after a transient
+	// failure (ack timeout or 429). Zero disables retrying.
+	BatchMaxRetries int `env:"WAHA_GOWS_STATUS_BATCH_MAX_RETRIES" envDefault:"2"`
+	// BatchRetryBackoff is the wait before the first retry; it triples on each
+	// further attempt (5s, 15s, ...).
+	BatchRetryBackoff time.Duration `env:"WAHA_GOWS_STATUS_BATCH_RETRY_BACKOFF" envDefault:"5s"`
 }
 
 func getStatusConfig() StatusConfig {
