@@ -237,10 +237,7 @@ func (st *StorageEventHandler) handleMessageEvent(event *events.Message) {
 			st.log.Warnf("Revoke message %v without a message id, ignoring", event.Info.ID)
 			return
 		}
-		err := st.storage.Messages.DeleteMessage(id)
-		if err != nil {
-			st.log.Errorf("Error deleting message %v: %v", id, err)
-		}
+		st.handleRevoke(event, id)
 		return
 	}
 

@@ -133,12 +133,18 @@ func TestHandleMessageEventRevokeWithoutKey(t *testing.T) {
 }
 
 func TestHandleMessageEventRevoke(t *testing.T) {
-	st, messages, _, _ := newTestHandler()
+	st, _, _, _ := newTestHandler()
 
 	revoke := waE2E.ProtocolMessage_REVOKE
 	id := "revoked-id"
+	author := types.NewJID("15550100001", types.DefaultUserServer)
+	source := types.MessageSource{Chat: author, Sender: author}
+	messages := &revokeMessageStorage{stored: map[types.MessageID]*storage.StoredMessage{
+		id: {Message: &events.Message{Info: types.MessageInfo{ID: id, MessageSource: source}}},
+	}}
+	st.storage.Messages = messages
 	event := &events.Message{
-		Info: types.MessageInfo{ID: "id-1"},
+		Info: types.MessageInfo{ID: "id-1", MessageSource: source},
 		Message: &waE2E.Message{
 			ProtocolMessage: &waE2E.ProtocolMessage{
 				Type: &revoke,
