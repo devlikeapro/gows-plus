@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -16,6 +18,7 @@ import (
 
 type SqlMessageStore struct {
 	*EntityRepository[storage.StoredMessage]
+	locks *messageLocks
 }
 
 var _ storage.MessageStorage = (*SqlMessageStore)(nil)
@@ -27,12 +30,41 @@ func (gc *GContainer) NewMessageStorage() *SqlMessageStore {
 		messageMapper,
 	)
 	return &SqlMessageStore{
-		repo,
+		EntityRepository: repo,
+		locks:            &messageLocks{},
 	}
 }
 
 func (s SqlMessageStore) UpsertOneMessage(msg *storage.StoredMessage) (err error) {
+	defer s.locks.lock(msg.Info.ID)()
 	return s.UpsertOne(msg)
+}
+
+// UpdateMessage is a read-modify-write that no other write of the same id can interleave with
+func (s SqlMessageStore) UpdateMessage(id types.MessageID, update func(msg *storage.StoredMessage) (bool, error)) error {
+	defer s.locks.lock(id)()
+	msg, err := s.GetById(id)
+	if err != nil {
+		return err
+	}
+	changed, err := update(msg)
+	if err != nil || !changed {
+		return err
+	}
+	return s.UpsertOne(msg)
+}
+
+// messageLocks serializes the writes of a message id, over a fixed set of mutexes
+type messageLocks struct {
+	stripes [64]sync.Mutex
+}
+
+func (l *messageLocks) lock(id types.MessageID) (unlock func()) {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(id))
+	mu := &l.stripes[h.Sum32()%uint32(len(l.stripes))]
+	mu.Lock()
+	return mu.Unlock
 }
 
 func (s SqlMessageStore) GetAllMessages(filters storage.MessageFilter, sort storage.Sort, pagination storage.Pagination, merge bool) ([]*storage.StoredMessage, error) {
@@ -122,6 +154,7 @@ func (s SqlMessageStore) DeleteChatMessages(jid types.JID, deleteBefore time.Tim
 }
 
 func (s SqlMessageStore) DeleteMessage(id types.MessageID) error {
+	defer s.locks.lock(id)()
 	return s.DeleteById(id)
 }
 

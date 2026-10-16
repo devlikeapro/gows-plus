@@ -21,6 +21,8 @@ type StorageEventHandler struct {
 	storage *storage.Storage
 	// ignoreJids specifies which types of JIDs should be ignored when processing events.
 	ignoreJids *IgnoreJidsConfig
+	// decryptSecret replaces the client decryption of secret encrypted messages in tests
+	decryptSecret func(event *events.Message) (*waE2E.Message, error)
 }
 
 func (st *StorageEventHandler) shouldIgnoreJID(jid types.JID) bool {
@@ -248,6 +250,11 @@ func (st *StorageEventHandler) handleMessageEvent(event *events.Message) {
 		return
 	}
 
+	// Edited message
+	if st.handleMessageEdit(event) {
+		return
+	}
+
 	// Chat ephemeral settings - changed
 	if protocolMessage != nil {
 		setting := ExtractEphemeralSettingsFromProtocolMessage(event.Info, protocolMessage)
@@ -293,25 +300,32 @@ func (st *StorageEventHandler) handleReceipt(event *events.Receipt) {
 	}
 	for _, id := range event.MessageIDs {
 		st.log.Debugf("Updating status for message %v(%v) to %v (receipt type: '%v')", event.Chat, id, status, event.Type.GoString())
-		msg, err := st.storage.Messages.GetMessageWithRetries(id)
+		// under the message lock, so writing the status back can't undo a concurrent edit
+		updated := false
+		err := st.updateMessageWithRetries(id, func(msg *storage.StoredMessage) (bool, error) {
+			updated = false
+			if msg.Status != nil && *msg.Status >= status {
+				return false, nil
+			}
+			msg.Status = &status
+			updated = true
+			return true, nil
+		})
 		if errors.Is(err, storage.ErrNotFound) {
 			st.log.Debugf("Message %v(%v) not found", event.Chat, id)
 			continue
 		}
-		if err != nil {
+		if errors.Is(err, storage.ErrStorageDisabled) {
 			st.log.Debugf("Error getting message - storage handle receipt %v(%v): %v", event.Chat, id, err)
 			continue
 		}
-		if msg.Status != nil && *msg.Status >= status {
-			continue
-		}
-		msg.Status = &status
-		err = st.storage.Messages.UpsertOneMessage(msg)
 		if err != nil {
 			st.log.Errorf("Error updating status for message %v(%v): %v", event.Chat, id, err)
 			continue
 		}
-		st.log.Debugf("Updated status for message %v(%v) to %v", event.Chat, id, status)
+		if updated {
+			st.log.Debugf("Updated status for message %v(%v) to %v", event.Chat, id, status)
+		}
 	}
 }
 

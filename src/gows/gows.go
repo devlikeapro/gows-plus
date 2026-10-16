@@ -88,7 +88,8 @@ func (gows *GoWS) reissueEvent(event interface{}) {
 		gows.enrichAltJIDs(&enriched)
 		sem := msg.Message.GetSecretEncryptedMessage()
 		if sem != nil && sem.GetSecretEncType() == waE2E.SecretEncryptedMessage_MESSAGE_EDIT {
-			go gows.handleSecretMessageEdit(gows.Context, msg)
+			// Decrypt into the copy: the storage event handler reads the original concurrently
+			go gows.handleSecretMessageEdit(gows.Context, &enriched)
 			return
 		} else if msg.Message.GetEncEventResponseMessage() != nil {
 			data = &enriched

@@ -46,3 +46,7 @@ func (s MessageStorage) DeleteChatMessages(jid types.JID, deleteBefore time.Time
 func (s MessageStorage) DeleteMessage(id types.MessageID) error {
 	return nil
 }
+
+func (s MessageStorage) UpdateMessage(id types.MessageID, update func(msg *storage.StoredMessage) (bool, error)) error {
+	return storage.StorageDisabled("messages")
+}

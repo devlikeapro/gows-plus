@@ -2,6 +2,7 @@ package sqlstorage
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/devlikeapro/gows/storage"
 	waProto "go.mau.fi/whatsmeow/binary/proto"
@@ -59,6 +60,7 @@ type messageTemp struct {
 	RawMessage            json.RawMessage               `json:"RawMessage"`
 	Status                storage.Status                `json:"Status"`
 	IsReal                bool                          `json:"IsReal"`
+	EditedAt              *time.Time                    `json:"EditedAt,omitempty"`
 }
 
 func (f *MessageMapper) Marshal(msg *storage.StoredMessage) ([]byte, error) {
@@ -104,6 +106,10 @@ func (f *MessageMapper) Marshal(msg *storage.StoredMessage) ([]byte, error) {
 		temp.Status = *msg.Status
 	}
 	temp.IsReal = msg.IsReal
+	if !msg.EditedAt.IsZero() {
+		editedAt := msg.EditedAt
+		temp.EditedAt = &editedAt
+	}
 
 	return json.Marshal(temp)
 }
@@ -145,6 +151,10 @@ func (f *MessageMapper) Unmarshal(data []byte, msg *storage.StoredMessage) error
 	}
 
 	msg.IsReal = temp.IsReal
+	msg.EditedAt = time.Time{}
+	if temp.EditedAt != nil {
+		msg.EditedAt = *temp.EditedAt
+	}
 
 	// Unmarshal Message if present
 	if !isNullJson(temp.Message) {

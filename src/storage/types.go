@@ -24,6 +24,8 @@ type StoredMessage struct {
 	*events.Message
 	IsReal bool
 	Status *Status
+	// EditedAt is the time of the latest edit applied to the message, zero if it was never edited.
+	EditedAt time.Time
 }
 
 type StoredContact struct {

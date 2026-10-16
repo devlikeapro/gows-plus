@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/devlikeapro/gows/media"
+	"github.com/devlikeapro/gows/storage"
 	"github.com/gogo/protobuf/proto"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -144,21 +145,23 @@ func (gows *GoWS) persistRefreshedDirectPath(id types.MessageID, directPath stri
 	if directPath == "" || gows.Storage == nil || gows.Storage.Messages == nil {
 		return
 	}
-	stored, err := gows.Storage.Messages.GetMessage(id)
+	persisted := false
+	err := gows.Storage.Messages.UpdateMessage(id, func(stored *storage.StoredMessage) (bool, error) {
+		if stored == nil || stored.Message == nil {
+			return false, nil
+		}
+		updateDirectPath(stored.Message.Message, directPath)
+		updateDirectPath(stored.Message.RawMessage, directPath)
+		persisted = true
+		return true, nil
+	})
 	if err != nil {
-		gows.Log.Warnf("Failed to load message '%s' to persist refreshed DirectPath: %v", id, err)
-		return
-	}
-	if stored == nil || stored.Message == nil {
-		return
-	}
-	updateDirectPath(stored.Message.Message, directPath)
-	updateDirectPath(stored.Message.RawMessage, directPath)
-	if err := gows.Storage.Messages.UpsertOneMessage(stored); err != nil {
 		gows.Log.Warnf("Failed to persist refreshed DirectPath for '%s': %v", id, err)
 		return
 	}
-	gows.Log.Infof("Persisted refreshed DirectPath for '%s'", id)
+	if persisted {
+		gows.Log.Infof("Persisted refreshed DirectPath for '%s'", id)
+	}
 }
 
 // requestAndWaitForMediaRetry sends a media-retry receipt to the phone (at most once

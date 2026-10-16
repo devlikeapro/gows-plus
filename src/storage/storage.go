@@ -29,6 +29,9 @@ type MessageStorage interface {
 	GetMessageWithRetries(id types.MessageID) (*StoredMessage, error)
 	DeleteChatMessages(jid types.JID, deleteBefore time.Time) error
 	DeleteMessage(id types.MessageID) error
+	// UpdateMessage stores the message again if update reports a change, with no other write
+	// of the same id in between. Returns ErrNotFound if the message is not stored.
+	UpdateMessage(id types.MessageID, update func(msg *StoredMessage) (bool, error)) error
 }
 
 type GroupStorage interface {
