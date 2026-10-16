@@ -56,6 +56,12 @@ func (gows *GoWS) SendStatusMessage(ctx context.Context, to types.JID, msg *waE2
 	for index, participants := range batches {
 		batchExtra := extra
 		batchExtra.Participants = participants
+		// Give the server room to acknowledge a large batch. Without this the
+		// whatsmeow default (75s) applies, and a batch that is actually delivered
+		// is reported as "timed out waiting for message send response".
+		if statusBatchTimeout > 0 {
+			batchExtra.Timeout = statusBatchTimeout
+		}
 
 		_, err := gows.Client.SendMessage(ctx, to, msg, batchExtra)
 		if err != nil {
