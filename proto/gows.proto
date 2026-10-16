@@ -143,6 +143,7 @@ service MessageService {
   rpc MarkRead(MarkReadRequest) returns (Empty);
   rpc EditMessage(EditMessageRequest) returns (MessageResponse);
   rpc RevokeMessage(RevokeMessageRequest) returns (MessageResponse);
+  rpc DeleteMessagesForMe(DeleteMessagesForMeRequest) returns (Empty);
   rpc SendButtonReply (ButtonReplyRequest) returns (MessageResponse);
 
   //
@@ -581,6 +582,13 @@ message RevokeMessageRequest {
   string sender = 3;
   string messageId = 4;
   repeated string participants = 5;
+}
+
+message DeleteMessagesForMeRequest {
+  Session session = 1;
+  string jid = 2;
+  repeated string messageIds = 3;
+  bool deleteMedia = 4;
 }
 
 message EditMessageRequest {

@@ -201,6 +201,12 @@ func (st *StorageEventHandler) processEvent(event interface{}) {
 			return
 		}
 		st.handleContact(contact)
+	case *events.DeleteForMe:
+		deleteForMe := event.(*events.DeleteForMe)
+		if st.shouldIgnoreJID(deleteForMe.ChatJID) {
+			return
+		}
+		st.handleDeleteForMe(deleteForMe)
 	// Labels
 	case *events.LabelEdit:
 		st.handleLabelEdit(event.(*events.LabelEdit))
