@@ -2,7 +2,7 @@ module github.com/devlikeapro/gows
 
 go 1.26.0
 
-toolchain go1.26.4
+toolchain go1.26.10
 
 require (
 	github.com/Masterminds/squirrel v1.5.4
@@ -12,13 +12,13 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3
 	github.com/h2non/bimg v1.1.9
-	github.com/jackc/pgx/v5 v5.7.6
+	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.52
 	github.com/stretchr/testify v1.12.0
 	github.com/u2takey/ffmpeg-go v0.5.0
 	go.mau.fi/whatsmeow v0.0.0-20260721154117-8b4a8ba0d318 // find "replace" for the project below with a fork project
-	google.golang.org/grpc v1.77.0
+	google.golang.org/grpc v1.83.2
 	google.golang.org/protobuf v1.36.12
 )
 
@@ -54,7 +54,7 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect
-	golang.org/x/net v0.59.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
