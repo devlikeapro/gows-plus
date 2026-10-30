@@ -107,7 +107,7 @@ func (gows *GoWS) DownloadAnyMediaWithRetry(
 	}
 
 	gows.Log.Infof("Got retriable media error for '%s' (%v), requesting media re-upload from phone", info.ID, err)
-	retryEvt, retryErr := gows.requestAndWaitForMediaRetry(ctx, info, mediaKey)
+	retryEvt, retryErr := gows.requestAndWaitForMediaRetry(ctx, gows.mediaRetryInfo(info), mediaKey)
 	if retryErr != nil {
 		gows.Log.Errorf("Media retry request for '%s' failed: %v", info.ID, retryErr)
 		return nil, err
@@ -135,6 +135,20 @@ func (gows *GoWS) DownloadAnyMediaWithRetry(
 		gows.persistRefreshedDirectPath(info.ID, notification.GetDirectPath())
 	}
 	return data, err
+}
+
+// mediaRetryInfo returns the stored Info of the message when info was built from the request only:
+// the retry receipt needs the sender of a group message and from_me, or the phone never answers it
+func (gows *GoWS) mediaRetryInfo(info *types.MessageInfo) *types.MessageInfo {
+	if !info.Sender.IsEmpty() || gows.Storage == nil || gows.Storage.Messages == nil {
+		return info
+	}
+	stored, err := gows.Storage.Messages.GetMessage(info.ID)
+	if err != nil || stored == nil || stored.Message == nil {
+		return info
+	}
+	storedInfo := stored.Message.Info
+	return &storedInfo
 }
 
 // persistRefreshedDirectPath writes a DirectPath obtained from a media retry back
