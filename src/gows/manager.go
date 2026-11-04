@@ -85,11 +85,20 @@ func SetDeviceAndBrowser(device string, browser string) {
 }
 
 // statusParticipantsBatchSize is the number of contacts per batch when sending to status@broadcast.
-// Set at startup via SetStatusParticipantsBatchSize; defaults to 500.
-var statusParticipantsBatchSize = 500
+// Set at startup via SetStatusParticipantsBatchSize; defaults to 5000.
+var statusParticipantsBatchSize = 5000
 
 func SetStatusParticipantsBatchSize(n int) {
 	statusParticipantsBatchSize = n
+}
+
+// statusBatchTimeout is how long to wait for the server to ack one status batch.
+// Set at startup via SetStatusBatchTimeout; defaults to 180s. Zero leaves
+// whatsmeow's own default (75s) in place.
+var statusBatchTimeout = 180 * time.Second
+
+func SetStatusBatchTimeout(d time.Duration) {
+	statusBatchTimeout = d
 }
 
 // SetKeepAliveInterval overrides whatsmeow's websocket keepalive ping interval.
