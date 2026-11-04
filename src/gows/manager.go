@@ -85,11 +85,50 @@ func SetDeviceAndBrowser(device string, browser string) {
 }
 
 // statusParticipantsBatchSize is the number of contacts per batch when sending to status@broadcast.
-// Set at startup via SetStatusParticipantsBatchSize; defaults to 500.
-var statusParticipantsBatchSize = 500
+// Set at startup via SetStatusParticipantsBatchSize; defaults to 5000.
+var statusParticipantsBatchSize = 5000
 
 func SetStatusParticipantsBatchSize(n int) {
+	// lo.Chunk requires a positive size, and the batch size is now the only thing
+	// deciding how a status is split, so refuse a value that would panic.
+	if n <= 0 {
+		return
+	}
 	statusParticipantsBatchSize = n
+}
+
+// statusBatchTimeout is how long to wait for the server to ack one status batch.
+// Set at startup via SetStatusBatchTimeout; defaults to 180s. Zero leaves
+// whatsmeow's own default (75s) in place.
+var statusBatchTimeout = 180 * time.Second
+
+func SetStatusBatchTimeout(d time.Duration) {
+	statusBatchTimeout = d
+}
+
+// statusBatchDelay is the pause between status batches.
+// Set at startup via SetStatusBatchDelay; defaults to 1.5s.
+var statusBatchDelay = 1500 * time.Millisecond
+
+func SetStatusBatchDelay(d time.Duration) {
+	statusBatchDelay = d
+}
+
+// statusBatchMaxRetries is how many extra attempts a status batch gets after a
+// transient failure. Set at startup via SetStatusBatchRetry; defaults to 2.
+var statusBatchMaxRetries = 2
+
+// statusBatchRetryBackoff is the wait before the first retry, tripling on each
+// further attempt. Set at startup via SetStatusBatchRetry; defaults to 5s.
+var statusBatchRetryBackoff = 5 * time.Second
+
+func SetStatusBatchRetry(maxRetries int, backoff time.Duration) {
+	if maxRetries >= 0 {
+		statusBatchMaxRetries = maxRetries
+	}
+	if backoff > 0 {
+		statusBatchRetryBackoff = backoff
+	}
 }
 
 // SetKeepAliveInterval overrides whatsmeow's websocket keepalive ping interval.
