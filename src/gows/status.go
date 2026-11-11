@@ -17,7 +17,6 @@ import (
 // SendStatusMessage sends a status message to a Broadcast list.
 func (gows *GoWS) SendStatusMessage(ctx context.Context, to types.JID, msg *waE2E.Message, extra whatsmeow.SendRequestExtra) (*whatsmeow.SendResponse, error) {
 	var err error
-	allowStatusReshare(msg)
 
 	allParticipants := extra.Participants
 	if len(allParticipants) == 0 {
@@ -84,16 +83,14 @@ func (gows *GoWS) SendStatusMessage(ctx context.Context, to types.JID, msg *waE2
 	return result, nil
 }
 
-// allowStatusReshare lets contacts reshare the status
-func allowStatusReshare(msg *waE2E.Message) {
-	info := ExtractContextInfo(msg)
+// PopulateContextInfoWithReshareStatus sets whether contacts can reshare the status
+func (gows *GoWS) PopulateContextInfoWithReshareStatus(info *waE2E.ContextInfo, canBeReshared bool) *waE2E.ContextInfo {
 	if info == nil {
-		// messages without ContextInfo (revoke) are left as is
 		info = &waE2E.ContextInfo{}
 	}
 	if info.FeatureEligibilities == nil {
 		info.FeatureEligibilities = &waE2E.ContextInfo_FeatureEligibilities{}
 	}
-	info.FeatureEligibilities.CanBeReshared = proto.Bool(true)
-	SetContextInfo(msg, info)
+	info.FeatureEligibilities.CanBeReshared = proto.Bool(canBeReshared)
+	return info
 }

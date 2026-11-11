@@ -80,6 +80,12 @@ func (s *Server) SendMessage(ctx context.Context, req *__.MessageRequest) (*__.M
 		contextInfo = cli.PopulateContextInfoWithMentions(contextInfo, req.GetMentions())
 	}
 
+	if jid == types.StatusBroadcastJID {
+		// on unless the request turns it off
+		canBeReshared := req.GetCanBeReshared() == nil || req.GetCanBeReshared().GetValue()
+		contextInfo = cli.PopulateContextInfoWithReshareStatus(contextInfo, canBeReshared)
+	}
+
 	if req.Media != nil && req.Media.GetContentPath() != "" {
 		content, err := os.ReadFile(req.Media.GetContentPath())
 		if err != nil {

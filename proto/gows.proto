@@ -466,6 +466,9 @@ message MessageRequest {
 
   // Forward an existing message as-is; other content fields are ignored
   ForwardOptions forward = 20;
+
+  // Status Message: allow contacts to reshare it, on when not set
+  OptionalBool canBeReshared = 21;
 }
 
 message Row {
