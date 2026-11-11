@@ -59,4 +59,4 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260817212433-ac3dfec99bb1 // indirect
 )
 
-replace go.mau.fi/whatsmeow => github.com/devlikeapro/whatsmeow v0.0.0-20261104061106-76ca6e9028ec // branch: fork-main-2026-10-13
+replace go.mau.fi/whatsmeow => github.com/devlikeapro/whatsmeow v0.0.0-20261111084256-f2251e103419 // branch: fork-main-2026-10-13

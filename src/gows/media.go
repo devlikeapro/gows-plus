@@ -280,6 +280,8 @@ func unwrapMediaMessage(msg *waE2E.Message) *waE2E.Message {
 		getFutureProofMessage(msg.GetViewOnceMessageV2()),
 		getFutureProofMessage(msg.GetViewOnceMessageV2Extension()),
 		getFutureProofMessage(msg.GetAssociatedChildMessage()),
+		getFutureProofMessage(msg.GetGroupStatusMessageV2()),
+		getFutureProofMessage(msg.GetGroupStatusMessage()),
 	}
 	for _, child := range nested {
 		if child == nil {
