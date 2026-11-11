@@ -4,17 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/samber/lo"
 	"github.com/samber/lo/mutable"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
-	"time"
+	"google.golang.org/protobuf/proto"
 )
 
 // SendStatusMessage sends a status message to a Broadcast list.
 func (gows *GoWS) SendStatusMessage(ctx context.Context, to types.JID, msg *waE2E.Message, extra whatsmeow.SendRequestExtra) (*whatsmeow.SendResponse, error) {
 	var err error
+	allowStatusReshare(msg)
 
 	allParticipants := extra.Participants
 	if len(allParticipants) == 0 {
@@ -79,4 +82,18 @@ func (gows *GoWS) SendStatusMessage(ctx context.Context, to types.JID, msg *waE2
 		Timestamp: time.Now(),
 	}
 	return result, nil
+}
+
+// allowStatusReshare lets contacts reshare the status
+func allowStatusReshare(msg *waE2E.Message) {
+	info := ExtractContextInfo(msg)
+	if info == nil {
+		// messages without ContextInfo (revoke) are left as is
+		info = &waE2E.ContextInfo{}
+	}
+	if info.FeatureEligibilities == nil {
+		info.FeatureEligibilities = &waE2E.ContextInfo_FeatureEligibilities{}
+	}
+	info.FeatureEligibilities.CanBeReshared = proto.Bool(true)
+	SetContextInfo(msg, info)
 }
