@@ -571,6 +571,13 @@ func (s *Server) SendMessage(ctx context.Context, req *__.MessageRequest) (*__.M
 		}
 	}
 
+	if req.GetViewOnce() {
+		message, err = asViewOnce(message)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	res, err := cli.SendMessage(ctx, jid, message, extra)
 	if err != nil {
 		return nil, err
@@ -864,4 +871,22 @@ func (s *Server) CancelEventMessage(ctx context.Context, req *__.CancelEventMess
 		Message:   data,
 	}
 	return &msg, nil
+}
+
+// asViewOnce marks image, video or voice media as "view once" and wraps it the way WhatsApp clients send it:
+// viewOnceMessageV2 for image and video, viewOnceMessageV2Extension for voice.
+func asViewOnce(message *waE2E.Message) (*waE2E.Message, error) {
+	viewOnce := proto.Bool(true)
+	switch {
+	case message.GetImageMessage() != nil:
+		message.ImageMessage.ViewOnce = viewOnce
+		return &waE2E.Message{ViewOnceMessageV2: &waE2E.FutureProofMessage{Message: message}}, nil
+	case message.GetVideoMessage() != nil:
+		message.VideoMessage.ViewOnce = viewOnce
+		return &waE2E.Message{ViewOnceMessageV2: &waE2E.FutureProofMessage{Message: message}}, nil
+	case message.GetAudioMessage() != nil:
+		message.AudioMessage.ViewOnce = viewOnce
+		return &waE2E.Message{ViewOnceMessageV2Extension: &waE2E.FutureProofMessage{Message: message}}, nil
+	}
+	return nil, fmt.Errorf("viewOnce is supported only for image, video and voice messages")
 }

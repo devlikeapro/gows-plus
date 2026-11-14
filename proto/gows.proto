@@ -466,6 +466,9 @@ message MessageRequest {
 
   // Forward an existing message as-is; other content fields are ignored
   ForwardOptions forward = 20;
+
+  // Send image, video or voice media as "view once"
+  bool viewOnce = 21;
 }
 
 message Row {
