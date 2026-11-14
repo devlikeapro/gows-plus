@@ -258,9 +258,7 @@ var ErrCannotForward = errors.New("this message type cannot be forwarded")
 var ErrCannotForwardPoll = errors.New("a poll cannot be forwarded")
 
 func isPollCreation(msg *waE2E.Message) bool {
-	return msg.GetPollCreationMessage() != nil ||
-		msg.GetPollCreationMessageV2() != nil ||
-		msg.GetPollCreationMessageV3() != nil
+	return PollCreationOf(msg) != nil
 }
 
 // BuildForwardedMessage builds a forwarded copy of original (media keys reused, not re-uploaded).

@@ -47,6 +47,28 @@ func (gows *GoWS) BuildPollCreationV3(name string, optionNames []string, selecta
 	}
 }
 
+// PollCreationOf returns the poll of a poll creation message, whichever version carries it.
+// WhatsApp sends polls as pollCreationMessage (v1), v2, v3 and - for polls with an end time
+// or hidden voter names - v5 / v6; reading only v1/v3 leaves the options empty and every
+// vote on the other versions fails with "failed to find hash in option hashes".
+func PollCreationOf(msg *waE2E.Message) *waE2E.PollCreationMessage {
+	if msg == nil {
+		return nil
+	}
+	for _, p := range []*waE2E.PollCreationMessage{
+		msg.GetPollCreationMessage(),
+		msg.GetPollCreationMessageV2(),
+		msg.GetPollCreationMessageV3(),
+		msg.GetPollCreationMessageV5(),
+		msg.GetPollCreationMessageV6(),
+	} {
+		if p != nil {
+			return p
+		}
+	}
+	return nil
+}
+
 func (gows *GoWS) extractPollVotes(ctx context.Context, msg *events.Message) (*[]string, error) {
 	// poll vote has hash inside selected options
 	// we need to decrypt it, find the original message,
@@ -62,11 +84,10 @@ func (gows *GoWS) extractPollVotes(ctx context.Context, msg *events.Message) (*[
 		return nil, err
 	}
 
-	// Creation message - either v1 or v3
-	creationMessage := storedMessage.Message.Message
-	pollCreationMessage := creationMessage.GetPollCreationMessageV3()
+	// Creation message - any version (v1, v2, v3, v5, v6)
+	pollCreationMessage := PollCreationOf(storedMessage.Message.Message)
 	if pollCreationMessage == nil {
-		pollCreationMessage = creationMessage.GetPollCreationMessage()
+		return nil, fmt.Errorf("stored message %s is not a poll creation", pollUpdate.GetPollCreationMessageKey().GetID())
 	}
 
 	// Get options-hashes
