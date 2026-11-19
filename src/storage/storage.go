@@ -17,6 +17,7 @@ type Storage struct {
 	LabelAssociations    LabelAssociationStorage
 	GroupMemberLabels    GroupMemberLabelStorage
 	Lidmap               LidmapStorage
+	CallLogs             CallLogStorage
 }
 
 type MessageStorage interface {
@@ -79,6 +80,13 @@ type GroupMemberLabelStorage interface {
 	GetGroupMemberLabel(group types.JID, member types.JID) (*GroupMemberLabel, error)
 	DeleteGroupMemberLabel(group types.JID, member types.JID) error
 	DeleteGroupMemberLabels(group types.JID) error
+}
+
+type CallLogStorage interface {
+	// UpsertCallLogs stores call log entries; an entry with a known call id replaces the stored one
+	UpsertCallLogs(logs []*CallLog) error
+	// GetCallLogs returns call log entries, newest first
+	GetCallLogs(filter CallLogFilter, pagination Pagination) ([]*CallLog, error)
 }
 
 type LidmapStorage interface {

@@ -122,3 +122,25 @@ var GroupMemberLabelsTable = Table{
 	// Last write wins - changes can arrive out of order (live message vs history sync)
 	UpdateOnConflictWhere: "EXCLUDED.timestamp >= gows_group_member_labels.timestamp",
 }
+
+var CallLogsTable = Table{
+	Name: "gows_call_logs",
+	Columns: []string{
+		"id",
+		"jid",
+		"timestamp",
+		"from_me",
+		"data",
+	},
+	DataField: "data",
+	OnConflict: []string{
+		"id",
+	},
+	// The same call arrives from history sync and from the app-state call_log collection, the latest copy wins
+	UpdateOnConflict: []string{
+		"jid",
+		"timestamp",
+		"from_me",
+		"data",
+	},
+}

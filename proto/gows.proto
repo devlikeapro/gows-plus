@@ -198,6 +198,7 @@ service MessageService {
   // Calls
   //
   rpc RejectCall(RejectCallRequest) returns (Empty);
+  rpc GetCallLogs(GetCallLogsRequest) returns (JsonList); // the account's call log, newest first
 
   //
   // Storage
@@ -840,6 +841,13 @@ message RejectCallRequest {
   Session session = 1;
   string from = 2;
   string id = 3;
+}
+
+message GetCallLogsRequest {
+  Session session = 1;
+  // Only the calls of this chat (the other party, or the group); empty = every call
+  string jid = 2;
+  Pagination pagination = 3;
 }
 
 //

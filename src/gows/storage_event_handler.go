@@ -173,6 +173,8 @@ func (st *StorageEventHandler) processEvent(event interface{}) {
 		)
 	case *events.HistorySync:
 		st.handleHistorySync(event.(*events.HistorySync))
+	case *events.AppState:
+		st.handleAppState(event.(*events.AppState))
 	// Groups
 	case *events.JoinedGroup:
 		group := event.(*events.JoinedGroup)
@@ -360,6 +362,10 @@ func (st *StorageEventHandler) handleHistorySync(event *events.HistorySync) {
 		}
 	}
 	st.log.Debugf("Saved history for %v chats", len(conversations))
+
+	if records := event.Data.GetCallLogRecords(); len(records) > 0 {
+		go st.saveCallLogsFromHistory(records)
+	}
 }
 
 func (st *StorageEventHandler) saveHistoryForOneChat(conv *waHistorySync.Conversation, chatJID types.JID) {
