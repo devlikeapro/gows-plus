@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"go.mau.fi/whatsmeow/proto/waE2E"
+	"go.mau.fi/whatsmeow/proto/waSyncAction"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 )
@@ -119,3 +120,18 @@ type GroupMemberLabel struct {
 }
 
 var ErrEmptyGroupMember = errors.New("group member label without a member")
+
+// CallLog is one entry of the account's call log - what the phone shows in the chat as a call bubble
+type CallLog struct {
+	ID        string                      `json:"id"`
+	Chat      types.JID                   `json:"chat"`      // the other party, or the group of a group call; empty when unknown
+	Timestamp time.Time                   `json:"timestamp"` // call start
+	FromMe    bool                        `json:"fromMe"`    // this account placed the call
+	Record    *waSyncAction.CallLogRecord `json:"record"`    // as WhatsApp sent it: result, duration, video, participants
+}
+
+type CallLogFilter struct {
+	Jid *types.JID
+}
+
+var ErrEmptyCallLog = errors.New("call log without a call id")

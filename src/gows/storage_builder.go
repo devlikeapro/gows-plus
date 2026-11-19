@@ -51,8 +51,10 @@ func BuildStorage(container *sqlstorage.GContainer, gows *GoWS, cfg StorageConfi
 
 	if cfg.Messages {
 		st.Messages = container.NewMessageStorage()
+		st.CallLogs = container.NewCallLogStorage()
 	} else {
 		st.Messages = noop.NewMessageStorage()
+		st.CallLogs = noop.NewCallLogStorage()
 	}
 
 	if cfg.Groups {
