@@ -62,21 +62,40 @@ func (s *Server) GetNewsletterInfo(ctx context.Context, req *__.NewsletterInfoRe
 	if err != nil {
 		return nil, err
 	}
-	id := req.GetId()
-	var resp *types.NewsletterMetadata
-	if gows.HasNewsletterSuffix(id) {
-		jid, err := types.ParseJID(id)
-		if err != nil {
-			return nil, err
-		}
-		resp, err = cli.GetNewsletterInfo(ctx, jid)
-	} else {
-		resp, err = cli.GetNewsletterInfoWithInvite(ctx, id)
-	}
+	resp, err := newsletterInfo(ctx, req.GetId(), cli.GetNewsletterInfo, cli.GetNewsletterInfoWithInvite)
 	if err != nil {
 		return nil, err
 	}
 	return toNewsletter(resp), nil
+}
+
+// newsletterInfo resolves newsletter metadata by "@newsletter" JID or by invite code.
+// The lookups are passed in so the error handling can be tested without a WhatsApp connection.
+func newsletterInfo(
+	ctx context.Context,
+	id string,
+	byJID func(context.Context, types.JID) (*types.NewsletterMetadata, error),
+	byInvite func(context.Context, string) (*types.NewsletterMetadata, error),
+) (*types.NewsletterMetadata, error) {
+	var resp *types.NewsletterMetadata
+	var err error
+	if gows.HasNewsletterSuffix(id) {
+		var jid types.JID
+		jid, err = types.ParseJID(id)
+		if err != nil {
+			return nil, err
+		}
+		resp, err = byJID(ctx, jid)
+	} else {
+		resp, err = byInvite(ctx, id)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil {
+		return nil, fmt.Errorf("newsletter %s: no metadata returned", id)
+	}
+	return resp, nil
 }
 
 func (s *Server) CreateNewsletter(ctx context.Context, req *__.CreateNewsletterRequest) (*__.Newsletter, error) {
