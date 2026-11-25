@@ -161,6 +161,8 @@ func (gows *GoWS) enrichAltJIDs(msg *events.Message) {
 }
 
 func (gows *GoWS) handleEvent(event interface{}) {
+	// before storage and reissue read the event concurrently
+	normalizeStatusIDs(event)
 	go gows.reissueEvent(event)
 	gows.storageEventHandler.handleEvent(event)
 }
