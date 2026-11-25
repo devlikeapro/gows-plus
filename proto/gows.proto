@@ -466,6 +466,20 @@ message MessageRequest {
 
   // Forward an existing message as-is; other content fields are ignored
   ForwardOptions forward = 20;
+
+  // PIX message (static key with native "copy" button)
+  PixMessage pix = 21;
+}
+
+message PixMessage {
+  string merchantName = 1;
+  string key = 2;
+  // CPF | CNPJ | PHONE | EMAIL | EVP
+  string keyType = 3;
+  // Defaults to BRL
+  string currency = 4;
+  // Generated if empty
+  string referenceId = 5;
 }
 
 message Row {
