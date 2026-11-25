@@ -127,6 +127,9 @@ func (s *Server) SendMessage(ctx context.Context, req *__.MessageRequest) (*__.M
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "failed to forward message '%s': %v", fwd.GetMessageId(), err)
 		}
+		if gows.IsPixMessage(message) {
+			extra.AdditionalNodes = &[]waBinary.Node{gows.PixBizNode()}
+		}
 	} else if req.GetPollVote() != nil {
 		vote := req.PollVote
 		if vote.Options == nil {
@@ -277,6 +280,23 @@ func (s *Server) SendMessage(ctx context.Context, req *__.MessageRequest) (*__.M
 		}
 		extra.AdditionalNodes = &[]waBinary.Node{node}
 
+	} else if req.GetPix() != nil {
+		// PIX Message
+		pix := gows.PixMessage{
+			MerchantName: req.Pix.MerchantName,
+			Key:          req.Pix.Key,
+			KeyType:      req.Pix.KeyType,
+			Currency:     req.Pix.Currency,
+			ReferenceID:  req.Pix.ReferenceId,
+		}
+		message, err = gows.BuildPixMessage(pix, contextInfo)
+		if err != nil {
+			if errors.Is(err, gows.ErrInvalidPix) {
+				return nil, status.Error(codes.InvalidArgument, err.Error())
+			}
+			return nil, err
+		}
+		extra.AdditionalNodes = &[]waBinary.Node{gows.PixBizNode()}
 	} else if req.Location != nil {
 		// Location Message
 		locationMessage := &waE2E.LocationMessage{

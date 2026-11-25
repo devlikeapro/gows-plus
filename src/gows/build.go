@@ -198,6 +198,8 @@ func ExtractContextInfo(msg *waE2E.Message) *waE2E.ContextInfo {
 		return msg.TemplateMessage.ContextInfo
 	case msg.ListMessage != nil:
 		return msg.ListMessage.ContextInfo
+	case msg.InteractiveMessage != nil:
+		return msg.InteractiveMessage.ContextInfo
 	case msg.PollCreationMessage != nil:
 		return msg.PollCreationMessage.ContextInfo
 	case msg.PollCreationMessageV2 != nil:
@@ -241,6 +243,8 @@ func SetContextInfo(msg *waE2E.Message, info *waE2E.ContextInfo) bool {
 		msg.TemplateMessage.ContextInfo = info
 	case msg.ListMessage != nil:
 		msg.ListMessage.ContextInfo = info
+	case msg.InteractiveMessage != nil:
+		msg.InteractiveMessage.ContextInfo = info
 	case msg.PollCreationMessage != nil:
 		msg.PollCreationMessage.ContextInfo = info
 	case msg.PollCreationMessageV2 != nil:
