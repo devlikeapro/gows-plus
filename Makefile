@@ -1,4 +1,4 @@
-MEOW_BRANCH ?= fork-main-2026-10-13
+MEOW_BRANCH ?= fork-main-2026-11-24
 
 all: clean build-proto test build
 
