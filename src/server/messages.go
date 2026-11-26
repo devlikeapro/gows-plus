@@ -544,10 +544,19 @@ func (s *Server) SendMessage(ctx context.Context, req *__.MessageRequest) (*__.M
 				return nil, err
 			}
 
-			// Get sticker dimensions
-			imgSize, err := media.CurrentSize(req.Media.Content)
-			if err != nil {
-				cli.Log.Errorf("Failed to get sticker dimensions: %v", err)
+			// Get sticker dimensions and animation flag from the WebP header,
+			// fall back to libvips for anything that is not a WebP
+			var imgSize media.Size
+			var animated bool
+			webp, err := media.ParseWebP(req.Media.Content)
+			if err == nil {
+				imgSize = media.Size{Width: webp.Width, Height: webp.Height}
+				animated = webp.Animated
+			} else {
+				imgSize, err = media.CurrentSize(req.Media.Content)
+				if err != nil {
+					cli.Log.Errorf("Failed to get sticker dimensions: %v", err)
+				}
 			}
 
 			// Attach
@@ -561,6 +570,7 @@ func (s *Server) SendMessage(ctx context.Context, req *__.MessageRequest) (*__.M
 				FileLength:    &mediaResponse.FileLength,
 				MediaKey:      mediaResponse.MediaKey,
 				FileEncSHA256: mediaResponse.FileEncSHA256,
+				IsAnimated:    proto.Bool(animated),
 			}
 			message.StickerMessage.ContextInfo = contextInfo
 		}
